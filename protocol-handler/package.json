@@ -1,0 +1,14 @@
+{
+  "name": "my3dlibrary-protocol-handler",
+  "version": "1.0.0",
+  "description": "Windows protocol handler for my3dlibrary:// URLs",
+  "main": "handler.js",
+  "bin": {
+    "my3dlibrary-handler": "./handler.js"
+  },
+  "pkg": {
+    "targets": ["node18-win-x64"],
+    "outputPath": "dist",
+    "assets": []
+  }
+}

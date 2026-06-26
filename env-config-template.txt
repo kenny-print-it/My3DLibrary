@@ -1,0 +1,18 @@
+# PrintLib Local - Environment Configuration
+# Rename this file to .env and fill in your values before starting.
+
+# Path to your 3D model library folder
+# Windows: C:\Users\Kenny\3DModels
+# Mac/Linux: /home/kenny/3DModels
+LIBRARY_PATH=
+
+# Secret key for login sessions
+# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+JWT_SECRET=
+
+# Optional: OpenAI-compatible API for auto-tagging and thumbnail picking
+LLM_API_URL=https://api.openai.com/v1
+LLM_API_KEY=
+LLM_MODEL=gpt-4o-mini
+
+PORT=3000

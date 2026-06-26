@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://printlib:printlib@db:3306/printlib
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - PORT=3000
+    volumes:
+      # Mount your local 3D model library folder here.
+      # Change the left side (before the colon) to the path on your computer.
+      # Example Windows path:  C:/Users/Kenny/3DModels:/library
+      # Example Mac/Linux path: /home/kenny/3DModels:/library
+      - ${LIBRARY_PATH:-./library-placeholder}:/library
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: printlib
+      MYSQL_USER: printlib
+      MYSQL_PASSWORD: printlib
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "printlib", "-pprintlib"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db_data:
