@@ -1,220 +1,132 @@
-# My3DLibrary
-My3DLibrary is a free, portable 3D model library manager for Windows — no install required. Organize your STL collection by folder, browse with a built-in 3D viewer, auto-tag models using local AI, and manage multiple drives. Just unzip and run. Your files stay on your PC. Built by Kenny Print It?
+# My3DLibrary — Portable 3D Model Library Manager
 
-My3DLibrary Portable v1.0 Beta - by Kenny Print It?
-=====================================================
+**A free, self-hosted Plex-style library for your 3D print model collection.**  
+No installation required. Runs on any Windows 10/11 PC straight from a folder or USB drive.
 
-QUICK START
------------
-Double-click  My3DLibrary.exe  (in the parent folder, next to this folder)
-  OR
-Double-click  Start.bat  (inside this folder)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0--Beta-blue.svg)](https://github.com/kennyprintit/my3dlibrary/releases)
+[![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/kennyprintit)
 
-Your browser will open automatically at http://localhost:3000
+---
 
-Keep the black command window open while using My3DLibrary.
-Press any key in that window to stop the server.
+## What is My3DLibrary?
 
+My3DLibrary is a portable Windows app that turns your folders of STL files into a browsable, searchable library — like Plex, but for 3D models.
 
-FOLDER STRUCTURE
-----------------
-| File / Folder Path | Description |
-| :--- | :--- |
-| **My3DLibrary.exe** | Double-click this to launch (outside this folder) |
-| **My3DLibrary-Portable\\** | |
-| &nbsp;&nbsp;└── `Start.bat` | Launcher script |
-| &nbsp;&nbsp;└── `Stop.bat` | Stop the server |
-| &nbsp;&nbsp;└── `runtime\node.exe` | Portable Node.js runtime (no install needed) |
-| &nbsp;&nbsp;└── `dist\index.js` | Application server |
-| &nbsp;&nbsp;└── `dist\public\` | Web interface files |
-| &nbsp;&nbsp;└── `node_modules\` | Server dependencies |
-| &nbsp;&nbsp;└── `data\` | Your database and settings (auto-created) |
-| &nbsp;&nbsp;└── `library\` | Your 3D model files (auto-created) |
-| &nbsp;&nbsp;└── `ollama\` | Place ollama.exe here for AI tagging (optional) |
-| &nbsp;&nbsp;└── `README.txt` | This file |
+- **Browse** your collection by collection and category with thumbnail previews
+- **View** models in a built-in interactive 3D STL viewer
+- **Auto-tag** models using local AI (Ollama/LLaVA) or OpenAI — no cloud required
+- **Search** by name, tag, or collection
+- **Manage** multiple library locations across different drives
+- **Portable** — runs from a USB drive, no install, no admin rights needed
 
+> Your files never leave your computer. My3DLibrary is 100% local.
 
-REQUIREMENTS
-------------
-- Windows 10 or 11 (64-bit)
-- No installation required
-- No admin rights needed
-- Works from USB drives and external storage
+---
 
+## Download
 
-SETTING UP YOUR LIBRARY
------------------------
-1. Open the app and go to Settings > Library
-2. Click "Add Folder" and browse to your 3D model folder
-3. Choose a scan depth (see below)
-4. Click "Start Scan" to import your models
+👉 **[Download the latest release](https://github.com/kennyprintit/my3dlibrary/releases)**
 
-THUMBNAILS: My3DLibrary automatically uses image files found inside each
-model folder as thumbnails. Just make sure each model folder contains at
-least one .jpg or .png image alongside the model files. No AI required.
+Just unzip and double-click `My3DLibrary.exe`. That's it.
 
+---
 
-USING GOOGLE DRIVE AS YOUR LIBRARY
------------------------------------
-My3DLibrary works with Google Drive by using the free
-"Google Drive for Desktop" app from Google. This mounts
-your Drive as a local drive letter on your PC (e.g. G:\)
-so My3DLibrary can scan it just like any other folder.
+## Screenshots
 
-Setup steps:
-  1. Download and install Google Drive for Desktop:
-     https://www.google.com/drive/download/
-  2. Sign in with your Google account.
-  3. Your Drive will appear as a new drive letter (e.g. G:\)
-     in File Explorer.
-  4. In My3DLibrary, go to Settings > Library > Add Folder
-     and browse to the drive letter Google assigned.
-  5. Select your 3D models folder and run a scan.
+<!-- Add screenshots here once you have them -->
 
-No API keys or special configuration needed — Google Drive
-for Desktop handles the sync automatically in the background.
-Files are available offline once synced.
+---
 
+## Quick Start
 
-SCAN DEPTH EXPLAINED
---------------------
-When adding a library folder, you choose how deep the scanner looks:
+1. Download and unzip `My3DLibrary-Portable-v1.0-Beta.zip`
+2. Double-click `My3DLibrary.exe`
+3. Your browser opens automatically at `http://localhost:3000`
+4. Go to **Settings → Library**, click **Add Folder**, and point it at your models folder
+5. Click **Start Scan** — your library populates automatically
 
-  2-LEVEL (default)
-  -----------------
-> Use this when each subfolder **IS** the model.
+See `My3DLibrary-Portable/README.txt` inside the ZIP for full documentation including AI setup, scan depth options, and troubleshooting.
 
-  | File / Folder Path | Description |
-  | :--- | :--- |
-  | **Cosplay\\** | *Root Category Folder* |
-  | &nbsp;&nbsp;└── **Helmet\\** | **<- becomes one model tile** |
-  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── `helmet.stl` | 3D Model file |
-  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── `preview.jpg` | Thumbnail preview |
-  | &nbsp;&nbsp;└── **Sword\\** | **<- becomes one model tile** |
-  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── `sword.stl` | 3D Model file |
-  
-  3-LEVEL
-  -------
-> Use this when you have a category or date folder between your root and the actual model folders.
+---
 
-  | File / Folder Path | Description |
-  | :--- | :--- |
-  | **Cosplay\\** | *Root Folder* |
-  | &nbsp;&nbsp;└── **Armor\\** | **<- becomes the collection label** |
-  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── **Helmet\\** | **<- becomes one model tile** |
-  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── **Gauntlets\\** | **<- becomes one model tile** |
-  | &nbsp;&nbsp;└── **Weapons\\** | **<- becomes the collection label** |
-  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── **Sword\\** | **<- becomes one model tile** |
+## Using Google Drive
 
-  DATE FOLDERS (3-level only):
-  Date-named folders (e.g. "Jan 2024", "2024-01", "January", "2024")
-  are used AS the collection label — they are NOT skipped. This means
-  your models will be grouped by date, which is the most common use case
-  for 3-level libraries organised by month or year.
+Install [Google Drive for Desktop](https://www.google.com/drive/download/) — it mounts your Drive as a local drive letter (e.g. `G:\`). Then add that drive path in Settings just like any local folder. No API keys needed.
 
-> Example with date folders:
+---
 
-  | File / Folder Path | Description |
-  | :--- | :--- |
-  | **Cosplay\\** | *Root Folder* |
-  | &nbsp;&nbsp;└── **Jan 2024\\** | **<- used as collection label "Jan 2024"** |
-  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── **Helmet\\** | **<- becomes one model tile under "Jan 2024"** |
-  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── **Sword\\** | **<- becomes one model tile under "Jan 2024"** |
-  | &nbsp;&nbsp;└── **Feb 2024\\** | **<- used as collection label "Feb 2024"** |
-  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── **Gauntlets\\** | **<- becomes one model tile under "Feb 2024"** |
+## AI Auto-Tagging (Optional)
 
+My3DLibrary can automatically tag your models by looking at their thumbnail images.
 
-AI TAGGING (OPTIONAL)
----------------------
-My3DLibrary can automatically tag your 3D models using AI.
-Thumbnails work WITHOUT AI - you do not need this to see model images.
+| Option | Cost | Setup |
+|---|---|---|
+| **Ollama + LLaVA** (recommended) | Free | Place `ollama.exe` in the `ollama\` folder, run `Download-AI-Model.bat` |
+| **OpenAI GPT-4o** | ~$0.01/model | Enter your API key in Settings |
+| **LM Studio** | Free | Start the local server, point Settings at `http://localhost:1234/v1` |
 
-To enable AI auto-tagging:
+Thumbnails and the STL viewer work **without AI**. AI is completely optional.
 
-  OPTION A - Ollama (Free, runs locally, no internet after setup)
-  ---------------------------------------------------------------
-  1. Download Ollama for Windows from: https://ollama.com/download/windows
-  2. Do NOT run the installer. Instead, copy ollama.exe into the
-     My3DLibrary-Portable\ollama\ folder (create it if needed).
-  3. Double-click  Download-AI-Model.bat  to download the LLaVA model
-     (~4.7 GB). This only needs to be done ONCE. The model is stored
-     inside the app folder (ollama\models\) so it is fully portable.
-  4. Start My3DLibrary normally — it detects Ollama automatically.
-  5. In the app, go to Settings > AI/LLM Configuration > Edit
-  6. Set API URL to:  http://localhost:11434
-  7. Set Model to:    llava
-  8. Save, then go to Settings > Tags and click "Auto-tag All"
+---
 
-  Note: After the one-time download the app works fully offline.
-  The model is stored in ollama\models\ (NOT in data\) so deleting
-  the data\ folder to reset the database will NOT re-download the model.
+## Building from Source
 
-  OPTION B - OpenAI (Paid, cloud-based)
-  --------------------------------------
-  1. Get an API key from: https://platform.openai.com/api-keys
-  2. In Settings > AI/LLM Configuration > Edit:
-     API URL:  https://api.openai.com/v1
-     API Key:  your OpenAI key
-     Model:    gpt-4o
-  3. Save and run Auto-tag from Settings > Tags
+```bash
+# Install dependencies
+pnpm install
 
-  OPTION C - LM Studio (Free, local GUI app)
-  -------------------------------------------
-  1. Download LM Studio from: https://lmstudio.ai
-  2. Load a vision model (e.g. LLaVA)
-  3. Start the local server in LM Studio
-  4. In Settings > AI/LLM Configuration > Edit:
-     API URL:  http://localhost:1234/v1
-     Model:    the model name shown in LM Studio
-  5. Save and run Auto-tag from Settings > Tags
+# Run in development mode
+pnpm dev
 
+# Build frontend
+npx vite build
 
-TROUBLESHOOTING
----------------
-Q: The browser opens but shows "This site can't be reached"
-A: The server is still starting up. Wait 10-15 seconds and refresh the page.
+# Build server bundle
+node build-server.mjs
+```
 
-Q: Windows Defender shows a warning when running My3DLibrary.exe
-A: Click "More info" then "Run anyway". This is normal for unsigned apps.
-   The app does not connect to the internet except for optional AI features.
+**Requirements:** Node.js 18+, pnpm
 
-Q: Thumbnails are not showing
-A: Make sure each model folder contains at least one image file (.jpg, .png)
-   alongside the model files. Run "Start Scan" again after adding images.
-   Thumbnails do NOT require AI to be configured.
+---
 
-Q: Scan finds 0 models
-A: Check your scan depth setting. If your folder has models directly inside
-   subfolders, use 2-level. If there is an extra category or date folder in
-   between, use 3-level. See "SCAN DEPTH EXPLAINED" above.
+## Tech Stack
 
-Q: Old scan results are showing wrong models or wrong structure
-A: The database may contain stale data from a previous scan. To reset:
-   1. Stop My3DLibrary (press any key in the command window)
-   2. Delete the  data\  folder inside My3DLibrary-Portable\
-   3. Restart My3DLibrary — the database will be recreated fresh
-   4. Go to Settings > Library and run a new scan
-   Note: This only deletes scan data. Your 3D model files are NOT affected.
+- **Frontend:** React 19, Tailwind CSS 4, shadcn/ui, tRPC
+- **Backend:** Node.js, Express, tRPC, Drizzle ORM
+- **Database:** SQLite (via better-sqlite3)
+- **3D Viewer:** Three.js / STLLoader
+- **AI:** Ollama (LLaVA / llama3.2-vision) or OpenAI-compatible API
 
-Q: Port 3000 is already in use
-A: Another app is using port 3000. Close it, or edit Start.bat and change
-   PORT=3000 to PORT=3001, then open http://localhost:3001 instead.
+---
 
-Q: How do I move My3DLibrary to a different folder or USB drive?
-A: Just copy the entire My3DLibrary-Portable folder (and My3DLibrary.exe)
-   to the new location. Everything is self-contained.
+## Contributing
 
-Q: I added a folder on an external drive but it shows as offline
-A: Make sure the drive is connected and the folder path is accessible.
-   You can toggle folders on/off in Settings > Library without removing them.
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/kennyprintit/my3dlibrary/issues).
 
+Pull requests are welcome. For major changes, please open an issue first to discuss what you'd like to change.
 
-ABOUT
------
-My3DLibrary is created by Kenny Print It?
-A Plex-style library for organizing your 3D print model collection.
+---
 
-- Facebook:   https://www.facebook.com/Kennyprintit
-- YouTube:    https://www.youtube.com/@hahakenny
-- Reddit:     https://www.reddit.com/user/hahakenny/
-- MakerWorld: https://makerworld.com/en/@hahakenny
+## Support
+
+If My3DLibrary saves you time or brings some order to your collection, consider buying me a coffee!
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/kennyprintit)
+
+---
+
+## License
+
+[MIT](LICENSE) — © 2026 Kenny Print It?
+
+---
+
+## About
+
+Created by **Kenny Print It?** — a dad from Virginia who turned a fascination with 3D printing into a full-blown obsession.
+
+- 🎥 YouTube: [@hahakenny](https://www.youtube.com/@hahakenny)
+- 📘 Facebook: [Kennyprintit](https://www.facebook.com/Kennyprintit)
+- 🌐 MakerWorld: [@hahakenny](https://makerworld.com/en/@hahakenny)
+- ☕ Ko-fi: [kennyprintit](https://ko-fi.com/kennyprintit)
