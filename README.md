@@ -20,16 +20,16 @@ FOLDER STRUCTURE
 ----------------
 My3DLibrary.exe          <- Double-click this to launch (outside this folder)
 My3DLibrary-Portable\
-  Start.bat              <- Launcher script
-  Stop.bat               <- Stop the server
-  runtime\node.exe       <- Portable Node.js runtime (no install needed)
-  dist\index.js          <- Application server
-  dist\public\           <- Web interface files
-  node_modules\          <- Server dependencies
-  data\                  <- Your database and settings (auto-created)
-  library\               <- Your 3D model files (auto-created)
-  ollama\                <- Place ollama.exe here for AI tagging (optional)
-  README.txt             <- This file
+-  Start.bat              <- Launcher script
+-  Stop.bat               <- Stop the server
+-  runtime\node.exe       <- Portable Node.js runtime (no install needed)
+-  dist\index.js          <- Application server
+-  dist\public\           <- Web interface files
+-  node_modules\          <- Server dependencies
+-  data\                  <- Your database and settings (auto-created)
+-  library\               <- Your 3D model files (auto-created)
+-  ollama\                <- Place ollama.exe here for AI tagging (optional)
+-  README.txt             <- This file
 
 
 REQUIREMENTS
@@ -206,7 +206,7 @@ ABOUT
 My3DLibrary is created by Kenny Print It?
 A Plex-style library for organizing your 3D print model collection.
 
-YouTube:    https://www.youtube.com/@hahakenny
-Facebook:   https://www.facebook.com/Kennyprintit
-Reddit:     https://www.reddit.com/user/hahakenny/
-MakerWorld: https://makerworld.com/en/@hahakenny
+- Facebook:   https://www.facebook.com/Kennyprintit
+- YouTube:    https://www.youtube.com/@hahakenny
+- Reddit:     https://www.reddit.com/user/hahakenny/
+- MakerWorld: https://makerworld.com/en/@hahakenny
