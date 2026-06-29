@@ -18,18 +18,20 @@ Press any key in that window to stop the server.
 
 FOLDER STRUCTURE
 ----------------
-My3DLibrary.exe          <- Double-click this to launch (outside this folder)
-My3DLibrary-Portable\
--  Start.bat              <- Launcher script
--  Stop.bat               <- Stop the server
--  runtime\node.exe       <- Portable Node.js runtime (no install needed)
--  dist\index.js          <- Application server
--  dist\public\           <- Web interface files
--  node_modules\          <- Server dependencies
--  data\                  <- Your database and settings (auto-created)
--  library\               <- Your 3D model files (auto-created)
--  ollama\                <- Place ollama.exe here for AI tagging (optional)
--  README.txt             <- This file
+| File / Folder Path | Description |
+| :--- | :--- |
+| **My3DLibrary.exe** | Double-click this to launch (outside this folder) |
+| **My3DLibrary-Portable\\** | |
+| &nbsp;&nbsp;└── `Start.bat` | Launcher script |
+| &nbsp;&nbsp;└── `Stop.bat` | Stop the server |
+| &nbsp;&nbsp;└── `runtime\node.exe` | Portable Node.js runtime (no install needed) |
+| &nbsp;&nbsp;└── `dist\index.js` | Application server |
+| &nbsp;&nbsp;└── `dist\public\` | Web interface files |
+| &nbsp;&nbsp;└── `node_modules\` | Server dependencies |
+| &nbsp;&nbsp;└── `data\` | Your database and settings (auto-created) |
+| &nbsp;&nbsp;└── `library\` | Your 3D model files (auto-created) |
+| &nbsp;&nbsp;└── `ollama\` | Place ollama.exe here for AI tagging (optional) |
+| &nbsp;&nbsp;└── `README.txt` | This file |
 
 
 REQUIREMENTS
@@ -80,26 +82,29 @@ When adding a library folder, you choose how deep the scanner looks:
 
   2-LEVEL (default)
   -----------------
-  Use this when each subfolder IS the model.
-  Example:
-    Cosplay\
-      Helmet\          <- becomes one model tile
-        helmet.stl
-        preview.jpg
-      Sword\           <- becomes one model tile
-        sword.stl
+> Use this when each subfolder **IS** the model.
 
+  | File / Folder Path | Description |
+  | :--- | :--- |
+  | **Cosplay\\** | *Root Category Folder* |
+  | &nbsp;&nbsp;└── **Helmet\\** | **<- becomes one model tile** |
+  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── `helmet.stl` | 3D Model file |
+  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── `preview.jpg` | Thumbnail preview |
+  | &nbsp;&nbsp;└── **Sword\\** | **<- becomes one model tile** |
+  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── `sword.stl` | 3D Model file |
+  
   3-LEVEL
   -------
-  Use this when you have a category or date folder between your root
-  and the actual model folders.
-  Example:
-    Cosplay\
-      Armor\           <- becomes the collection label
-        Helmet\        <- becomes one model tile
-        Gauntlets\     <- becomes one model tile
-      Weapons\         <- becomes the collection label
-        Sword\         <- becomes one model tile
+> Use this when you have a category or date folder between your root and the actual model folders.
+
+  | File / Folder Path | Description |
+  | :--- | :--- |
+  | **Cosplay\\** | *Root Folder* |
+  | &nbsp;&nbsp;└── **Armor\\** | **<- becomes the collection label** |
+  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── **Helmet\\** | **<- becomes one model tile** |
+  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── **Gauntlets\\** | **<- becomes one model tile** |
+  | &nbsp;&nbsp;└── **Weapons\\** | **<- becomes the collection label** |
+  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── **Sword\\** | **<- becomes one model tile** |
 
   DATE FOLDERS (3-level only):
   Date-named folders (e.g. "Jan 2024", "2024-01", "January", "2024")
@@ -107,13 +112,16 @@ When adding a library folder, you choose how deep the scanner looks:
   your models will be grouped by date, which is the most common use case
   for 3-level libraries organised by month or year.
 
-  Example with date folders:
-    Cosplay\
-      Jan 2024\        <- used as collection label "Jan 2024"
-        Helmet\        <- becomes one model tile under "Jan 2024"
-        Sword\         <- becomes one model tile under "Jan 2024"
-      Feb 2024\        <- used as collection label "Feb 2024"
-        Gauntlets\     <- becomes one model tile under "Feb 2024"
+> Example with date folders:
+
+  | File / Folder Path | Description |
+  | :--- | :--- |
+  | **Cosplay\\** | *Root Folder* |
+  | &nbsp;&nbsp;└── **Jan 2024\\** | **<- used as collection label "Jan 2024"** |
+  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── **Helmet\\** | **<- becomes one model tile under "Jan 2024"** |
+  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── **Sword\\** | **<- becomes one model tile under "Jan 2024"** |
+  | &nbsp;&nbsp;└── **Feb 2024\\** | **<- used as collection label "Feb 2024"** |
+  | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── **Gauntlets\\** | **<- becomes one model tile under "Feb 2024"** |
 
 
 AI TAGGING (OPTIONAL)
