@@ -126,7 +126,7 @@ If My3DLibrary saves you time or brings some order to your collection, consider 
 
 Created by **Kenny Print It?** — a dad from Virginia who turned a fascination with 3D printing into a full-blown obsession.
 
-- 🎥 YouTube: [@hahakenny](https://www.youtube.com/@hahakenny)
 - 📘 Facebook: [Kennyprintit](https://www.facebook.com/Kennyprintit)
+- 🎥 YouTube: [@hahakenny](https://www.youtube.com/@hahakenny)
 - 🌐 MakerWorld: [@hahakenny](https://makerworld.com/en/@hahakenny)
 - ☕ Ko-fi: [kennyprintit](https://ko-fi.com/kennyprintit)
