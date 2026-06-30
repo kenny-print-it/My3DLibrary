@@ -130,3 +130,9 @@ Created by **Kenny Print It?** — a dad from Virginia who turned a fascination 
 - 🎥 YouTube: [@hahakenny](https://www.youtube.com/@hahakenny)
 - 🌐 MakerWorld: [@hahakenny](https://makerworld.com/en/@hahakenny)
 - ☕ Ko-fi: [kennyprintit](https://ko-fi.com/kennyprintit)
+
+### 💻 Downloads
+- 🪟 **Windows:** `My3DLibrary-Portable-v1.0-Beta.zip`
+- 🍎 **macOS (Intel + Apple Silicon):** `My3DLibrary-Mac-v1.0-Beta.zip`
+  > First time: right-click → Open to bypass Gatekeeper
+
