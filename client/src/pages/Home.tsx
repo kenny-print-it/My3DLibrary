@@ -43,7 +43,19 @@ import {
 function getModelImageUrl(images: any[] | null | undefined, heroImage: string | null | undefined, _size: number): string | null {
   if (!images || images.length === 0) return null;
   if (heroImage) {
-    const hero = images.find((img: any) => heroImage.includes(img.id) || img.localUrl === heroImage || img.thumbnailUrl === heroImage);
+    // If heroImage is already a usable URL (local-files proxy, Drive proxy, or absolute URL), return it directly.
+    // This covers local files where heroImage = thumbnailLink = "/local-files/..."
+    if (heroImage.startsWith('/local-files/') || heroImage.startsWith('/api/drive-image/') || heroImage.startsWith('http')) {
+      return heroImage;
+    }
+    // Fallback: find the matching image object by any known field
+    const hero = images.find((img: any) =>
+      img.thumbnailLink === heroImage ||
+      img.webContentLink === heroImage ||
+      img.localUrl === heroImage ||
+      img.thumbnailUrl === heroImage ||
+      (img.id && (heroImage.includes(img.id) || heroImage === `/api/drive-image/${img.id}`))
+    );
     if (hero) return hero.localUrl || hero.thumbnailUrl || hero.thumbnailLink || null;
   }
   return images[0]?.localUrl || images[0]?.thumbnailUrl || images[0]?.thumbnailLink || null;
@@ -466,7 +478,12 @@ export default function Home() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight">My 3D Library</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">My 3D Library</h1>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 tracking-wide">
+              v{__APP_VERSION__}
+            </span>
+          </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             {models.length} model{models.length !== 1 ? "s" : ""} · {topCategories.length} collection{topCategories.length !== 1 ? "s" : ""}
           </p>

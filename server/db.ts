@@ -1,5 +1,8 @@
 import { eq, inArray, notInArray, like, and, sql, desc, asc, isNull } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
 import {
   InsertUser,
   users,
@@ -23,12 +26,21 @@ import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+function getDbPath(): string {
+  return ENV.dbPath;
+}
+
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const dbPath = getDbPath();
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+      const sqlite = new Database(dbPath);
+      sqlite.pragma("journal_mode = WAL");
+      sqlite.pragma("foreign_keys = ON");
+      _db = drizzle(sqlite);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn("[Database] Failed to open SQLite:", error);
       _db = null;
     }
   }
@@ -61,7 +73,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  // SQLite: check if exists, then insert or update
+  const existingUser = await db.select().from(users).where(eq(users.openId, values.openId!)).limit(1);
+  if (existingUser.length > 0) {
+    await db.update(users).set(updateSet).where(eq(users.openId, values.openId!));
+  } else {
+    await db.insert(users).values(values);
+  }
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -115,7 +133,12 @@ export async function getSetting(key: string): Promise<string | null> {
 export async function setSetting(key: string, value: string): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.insert(settings).values({ key, value }).onDuplicateKeyUpdate({ set: { value } });
+  const existingSetting = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+  if (existingSetting.length > 0) {
+    await db.update(settings).set({ value }).where(eq(settings.key, key));
+  } else {
+    await db.insert(settings).values({ key, value });
+  }
 }
 
 export async function getAllSettings(): Promise<Record<string, string>> {
@@ -132,18 +155,18 @@ export async function getLibraryPaths() {
   if (!db) return [];
   return db.select().from(libraryPaths).orderBy(asc(libraryPaths.sortOrder), asc(libraryPaths.id));
 }
-export async function getEnabledLibraryPaths(): Promise<string[]> {
+export async function getEnabledLibraryPaths(): Promise<{ path: string; scanDepth: number }[]> {
   const db = await getDb();
   if (!db) return [];
   const rows = await db.select().from(libraryPaths).where(eq(libraryPaths.enabled, true)).orderBy(asc(libraryPaths.sortOrder));
-  return rows.map(r => r.path);
+  return rows.map(r => ({ path: r.path, scanDepth: r.scanDepth ?? 2 }));
 }
-export async function addLibraryPath(data: { path: string; label: string }): Promise<void> {
+export async function addLibraryPath(data: { path: string; label: string; scanDepth?: number }): Promise<void> {
   const db = await getDb();
   if (!db) return;
   const existing = await db.select().from(libraryPaths).orderBy(desc(libraryPaths.sortOrder)).limit(1);
   const nextSort = existing.length > 0 ? (existing[0].sortOrder + 1) : 0;
-  await db.insert(libraryPaths).values({ path: data.path, label: data.label, sortOrder: nextSort });
+  await db.insert(libraryPaths).values({ path: data.path, label: data.label, scanDepth: data.scanDepth ?? 2, sortOrder: nextSort });
 }
 export async function removeLibraryPath(id: number): Promise<void> {
   const db = await getDb();
@@ -160,6 +183,11 @@ export async function updateLibraryPathLabel(id: number, label: string): Promise
   if (!db) return;
   await db.update(libraryPaths).set({ label }).where(eq(libraryPaths.id, id));
 }
+export async function updateLibraryPathDepth(id: number, scanDepth: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(libraryPaths).set({ scanDepth }).where(eq(libraryPaths.id, id));
+}
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
@@ -174,7 +202,7 @@ export async function upsertCategory(data: {
   await db
     .insert(categories)
     .values(data)
-    .onDuplicateKeyUpdate({ set: { name: data.name, path: data.path } });
+    .onConflictDoUpdate({ target: categories.driveId, set: { name: data.name, path: data.path } });
 }
 
 export async function getAllCategories() {
@@ -232,7 +260,8 @@ export async function upsertModel(data: {
   await db
     .insert(models)
     .values(values)
-    .onDuplicateKeyUpdate({
+    .onConflictDoUpdate({
+      target: models.driveId,
       set: {
         name: data.name,
         categoryId: data.categoryId ?? undefined,
@@ -244,7 +273,6 @@ export async function upsertModel(data: {
         imageCount: data.images.length,
         thumbnailUrl: data.thumbnailUrl,
         lastScanned: new Date(),
-        // Only set driveCreatedAt if we have a value (don't overwrite with null on re-scans)
         ...(data.driveCreatedAt ? { driveCreatedAt: data.driveCreatedAt } : {}),
       },
     });
@@ -510,7 +538,7 @@ export async function deleteCategoriesNotIn(driveIds: string[]): Promise<number>
     .delete(categories)
     .where(notInArray(categories.driveId, driveIds));
 
-  return (result as any)?.[0]?.affectedRows ?? 0;
+  return (result as any)?.changes ?? 0;
 }
 
 // ─── Access Control Helpers ───────────────────────────────────────────────────
@@ -649,8 +677,9 @@ export async function createResource(data: {
   // Place new resource at the end
   const existing = await db.select({ id: resources.id }).from(resources);
   const sortOrder = existing.length;
-  const [result] = await db.insert(resources).values({ ...data, sortOrder });
-  return (result as any).insertId as number;
+  await db.insert(resources).values({ ...data, sortOrder });
+  const inserted = await db.select({ id: resources.id }).from(resources).where(eq(resources.name, data.name)).orderBy(desc(resources.id)).limit(1);
+  return inserted[0]?.id ?? 0;
 }
 
 export async function updateResource(
@@ -666,4 +695,159 @@ export async function deleteResource(id: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
   await db.delete(resources).where(eq(resources.id, id));
+}
+
+// ─── Embedded migration SQL (avoids file system dependency in pkg bundle) ────
+const MIGRATION_SQL = `
+CREATE TABLE IF NOT EXISTS \`access_requests\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`email\` text NOT NULL,\n\t\`name\` text,\n\t\`openId\` text,\n\t\`status\` text DEFAULT 'pending' NOT NULL,\n\t\`preAdded\` integer DEFAULT false NOT NULL,\n\t\`requestedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`reviewedAt\` integer\n);
+CREATE UNIQUE INDEX IF NOT EXISTS \`access_requests_email_unique\` ON \`access_requests\` (\`email\`);
+CREATE TABLE IF NOT EXISTS \`categories\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`driveId\` text,\n\t\`name\` text NOT NULL,\n\t\`customLabel\` text,\n\t\`parentDriveId\` text,\n\t\`path\` text,\n\t\`sortOrder\` integer DEFAULT 0 NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE UNIQUE INDEX IF NOT EXISTS \`categories_driveId_unique\` ON \`categories\` (\`driveId\`);
+CREATE TABLE IF NOT EXISTS \`library_paths\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`path\` text NOT NULL,\n\t\`label\` text NOT NULL,\n\t\`enabled\` integer DEFAULT true NOT NULL,\n\t\`scanDepth\` integer DEFAULT 2 NOT NULL,\n\t\`sortOrder\` integer DEFAULT 0 NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE TABLE IF NOT EXISTS \`model_tags\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`modelId\` integer NOT NULL,\n\t\`tagId\` integer NOT NULL\n);
+CREATE TABLE IF NOT EXISTS \`models\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`driveId\` text,\n\t\`name\` text NOT NULL,\n\t\`categoryId\` integer,\n\t\`path\` text,\n\t\`images\` text DEFAULT '[]',\n\t\`modelFiles\` text DEFAULT '[]',\n\t\`files\` text DEFAULT '[]',\n\t\`fileCount\` integer DEFAULT 0,\n\t\`imageCount\` integer DEFAULT 0,\n\t\`thumbnailUrl\` text,\n\t\`heroImage\` text,\n\t\`heroImageSource\` text,\n\t\`driveCreatedAt\` integer,\n\t\`customNotes\` text,\n\t\`isFavorite\` integer DEFAULT false,\n\t\`tagsLockedAt\` integer,\n\t\`lastScanned\` integer DEFAULT (unixepoch('now') * 1000),\n\t\`rootPath\` text,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE UNIQUE INDEX IF NOT EXISTS \`models_driveId_unique\` ON \`models\` (\`driveId\`);
+CREATE TABLE IF NOT EXISTS \`resources\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`name\` text NOT NULL,\n\t\`url\` text NOT NULL,\n\t\`logoUrl\` text,\n\t\`description\` text,\n\t\`sortOrder\` integer DEFAULT 0 NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE TABLE IF NOT EXISTS \`scan_logs\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`status\` text DEFAULT 'running' NOT NULL,\n\t\`modelsFound\` integer DEFAULT 0,\n\t\`categoriesFound\` integer DEFAULT 0,\n\t\`errorMessage\` text,\n\t\`startedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`completedAt\` integer\n);
+CREATE TABLE IF NOT EXISTS \`settings\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`key\` text NOT NULL,\n\t\`value\` text,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE UNIQUE INDEX IF NOT EXISTS \`settings_key_unique\` ON \`settings\` (\`key\`);
+CREATE TABLE IF NOT EXISTS \`tags\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`name\` text NOT NULL,\n\t\`color\` text DEFAULT '#6366f1',\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE UNIQUE INDEX IF NOT EXISTS \`tags_name_unique\` ON \`tags\` (\`name\`);
+CREATE TABLE IF NOT EXISTS \`users\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`name\` text,\n\t\`username\` text,\n\t\`passwordHash\` text,\n\t\`openId\` text,\n\t\`email\` text,\n\t\`role\` text DEFAULT 'user' NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`lastSignedIn\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE UNIQUE INDEX IF NOT EXISTS \`users_username_unique\` ON \`users\` (\`username\`);
+`;
+
+// ─── Auto-init: apply embedded migration SQL if DB is empty ──────────────────
+export async function initDbIfNeeded(): Promise<void> {
+  const dbPath = getDbPath();
+  const fs = await import("fs");
+  const path = await import("path");
+  const Database = (await import("better-sqlite3")).default;
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  const sqlite = new Database(dbPath);
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("foreign_keys = ON");
+  // Check if tables exist
+  const tables = sqlite.prepare("SELECT count(*) as n FROM sqlite_master WHERE type='table' AND name='users'").get() as { n: number };
+  // Always run additive migrations (safe for existing DBs)
+  try {
+    sqlite.exec("ALTER TABLE library_paths ADD COLUMN scanDepth integer DEFAULT 2 NOT NULL;");
+    console.log("[DB Migrate] Added scanDepth column to library_paths.");
+  } catch { /* column already exists — ignore */ }
+  if (tables.n === 0) {
+    // Apply embedded migration SQL (no file system dependency)
+    const stmts = MIGRATION_SQL.split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+    for (const stmt of stmts) {
+      try { sqlite.exec(stmt + ";"); } catch (e: any) { console.warn("[DB Init] Skipped:", e.message?.substring(0, 80)); }
+    }
+    console.log("[DB Init] Database initialized.");
+    // Auto-seed library path from LIBRARY_PATH env if set
+    const libraryPath = process.env.LIBRARY_PATH;
+    if (libraryPath && fs.existsSync(libraryPath)) {
+      try {
+        sqlite.prepare("INSERT INTO library_paths (path, label, enabled, sortOrder) VALUES (?, ?, 1, 0)").run(libraryPath, "My 3D Library");
+        console.log("[DB Init] Library path seeded:", libraryPath);
+      } catch (e: any) { console.warn("[DB Init] Could not seed library path:", e.message); }
+    }
+  }
+
+  // Seed default resources if the table is empty (covers both fresh installs and
+  // existing DBs that were created before seeding was added).
+  const resourceCount = (sqlite.prepare("SELECT count(*) as n FROM resources").get() as { n: number }).n;
+  if (resourceCount === 0) {
+    const defaultResources = [
+      { name: "Yosh Studios", url: "https://www.patreon.com/yoshstudios",  logoUrl: "/res-yosh.jpg",        description: "Monthly 3D printable miniatures and terrain by Yosh",    sortOrder: 0 },
+      { name: "MakerWorld",   url: "https://makerworld.com",               logoUrl: "/res-makerworld.png",  description: "Bambu Lab's model platform",                             sortOrder: 1 },
+      { name: "Makeronline",  url: "https://makeronline.com",              logoUrl: "/res-makeronline.png", description: "3D printing community and model sharing platform",        sortOrder: 2 },
+      { name: "Printables",   url: "https://www.printables.com",           logoUrl: "/res-printables.png",  description: "Free models from Prusa, huge community",                  sortOrder: 3 },
+      { name: "Thingiverse",  url: "https://www.thingiverse.com",          logoUrl: "/res-thingiverse.png", description: "One of the original 3D model repositories",              sortOrder: 4 },
+      { name: "Cults3D",      url: "https://cults3d.com",                  logoUrl: "/res-cults3d.png",     description: "Designer marketplace — free and paid models",             sortOrder: 5 },
+      { name: "Thangs",       url: "https://thangs.com",                   logoUrl: "/res-thangs.jpg",      description: "3D search engine across multiple sites",                  sortOrder: 6 },
+      { name: "YouMagine",    url: "https://www.youmagine.com",            logoUrl: "/res-youmagine.png",   description: "Ultimaker's open-source model community",                sortOrder: 7 },
+    ];
+    const insertResource = sqlite.prepare("INSERT INTO resources (name, url, logoUrl, description, sortOrder) VALUES (?, ?, ?, ?, ?)");
+    for (const r of defaultResources) {
+      try { insertResource.run(r.name, r.url, (r as any).logoUrl ?? null, r.description, r.sortOrder); } catch (e: any) { console.warn("[DB Seed] Could not seed resource:", r.name, e.message); }
+    }
+    console.log("[DB Seed] Default resources seeded.");
+  }
+
+  // Seed default tags if the table is empty (covers both fresh installs and
+  // existing DBs created before tag seeding was added).
+  const tagCount = (sqlite.prepare("SELECT count(*) as n FROM tags").get() as { n: number }).n;
+  if (tagCount === 0) {
+    const defaultTags: Array<{ name: string; color: string }> = [
+      // Vehicles
+      { name: "Bronco",                color: "#6b7280" },
+      { name: "RC",                    color: "#6b7280" },
+      { name: "Truck",                 color: "#6b7280" },
+      { name: "Ford",                  color: "#6b7280" },
+      { name: "Car",                   color: "#6b7280" },
+      // Franchises / IPs
+      { name: "Pokemon",               color: "#eab308" },
+      { name: "Mandalorian",           color: "#6b7280" },
+      { name: "Star Wars",             color: "#3b82f6" },
+      { name: "Marvel",                color: "#ef4444" },
+      { name: "Avengers",              color: "#ef4444" },
+      { name: "Thanos",                color: "#8b5cf6" },
+      { name: "Red Guardian",          color: "#ef4444" },
+      { name: "Borderlands",           color: "#eab308" },
+      { name: "Yu-Gi-Oh",              color: "#eab308" },
+      { name: "Blue Eyes White Dragon",color: "#3b82f6" },
+      { name: "Lord of the Rings",     color: "#6b7280" },
+      { name: "Nazgul",                color: "#6b7280" },
+      { name: "Morgoth",               color: "#6b7280" },
+      { name: "Doom",                  color: "#ef4444" },
+      { name: "Doomslayer",            color: "#ef4444" },
+      { name: "Digimon",               color: "#3b82f6" },
+      { name: "Attack on Titan",       color: "#6b7280" },
+      { name: "Anime",                 color: "#ec4899" },
+      { name: "One Piece",             color: "#eab308" },
+      { name: "Disney",                color: "#3b82f6" },
+      { name: "Nintendo",              color: "#ef4444" },
+      { name: "Mario",                 color: "#ef4444" },
+      { name: "My Hero Academia",      color: "#3b82f6" },
+      { name: "Stranger Things",       color: "#6b7280" },
+      { name: "He-Man",                color: "#eab308" },
+      { name: "Gundam",                color: "#3b82f6" },
+      { name: "Transformers",          color: "#6b7280" },
+      { name: "Arc Raiders",           color: "#6b7280" },
+      { name: "Chainsawman",           color: "#ef4444" },
+      { name: "Demon Slayer",           color: "#ef4444" },
+      { name: "TMNT",                   color: "#22c55e" },
+      // Categories / types
+      { name: "cosplay",               color: "#ec4899" },
+      { name: "props",                 color: "#6b7280" },
+      { name: "life size",             color: "#6b7280" },
+      { name: "statues",               color: "#6b7280" },
+      { name: "masks",                 color: "#6b7280" },
+      { name: "helmets",               color: "#6b7280" },
+      { name: "armor",                 color: "#6b7280" },
+      { name: "lamps",                 color: "#eab308" },
+      { name: "replicas",              color: "#6b7280" },
+      { name: "minis",                 color: "#22c55e" },
+      { name: "weapons",               color: "#6b7280" },
+      { name: "flail",                 color: "#6b7280" },
+      { name: "crown",                 color: "#eab308" },
+      { name: "Bone",                  color: "#6b7280" },
+      { name: "Skeleton",              color: "#6b7280" },
+    ];
+    const insertTag = sqlite.prepare("INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?)");
+    for (const t of defaultTags) {
+      try { insertTag.run(t.name, t.color); } catch (e: any) { console.warn("[DB Seed] Could not seed tag:", t.name, e.message); }
+    }
+    console.log("[DB Seed] Default tags seeded.");
+  }
+
+  // Seed default AI/LLM settings on every startup (INSERT OR IGNORE preserves user changes)
+  const defaultSettings: Array<{ key: string; value: string }> = [
+    { key: "llm_api_url", value: "http://localhost:11434" },
+    { key: "llm_model",   value: "llava" },
+  ];
+  const insertSetting = sqlite.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
+  for (const s of defaultSettings) {
+    try { insertSetting.run(s.key, s.value); } catch (e: any) { console.warn("[DB Seed] Could not seed setting:", s.key, e.message); }
+  }
+
+  sqlite.close();
 }

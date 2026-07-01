@@ -1,1 +1,0 @@
-ALTER TABLE `categories` ADD `sortOrder` int DEFAULT 0 NOT NULL;

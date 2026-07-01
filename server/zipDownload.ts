@@ -47,7 +47,7 @@ export async function zipDownloadHandler(req: Request, res: Response) {
     }
 
     // model.driveId is the relative path from library root: "CollectionName/ModelName"
-    const modelFolderPath = path.join(libraryPath, model.driveId);
+    const modelFolderPath = path.join(libraryPath, model.driveId ?? "");
     if (!fs.existsSync(modelFolderPath)) {
       res.status(404).json({ error: "Model folder not found on disk" });
       return;

@@ -1,190 +1,167 @@
 import {
-  int,
-  mysqlEnum,
-  mysqlTable,
+  integer,
+  sqliteTable,
   text,
-  timestamp,
-  varchar,
-  bigint,
-  boolean,
-  json,
-} from "drizzle-orm/mysql-core";
+} from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
-  // Local auth fields
-  username: varchar("username", { length: 64 }).unique(),
-  passwordHash: text("passwordHash"),
-  // Legacy / optional fields (kept for schema compatibility)
-  openId: varchar("openId", { length: 64 }).unique(),
+const now = sql`(unixepoch('now') * 1000)`;
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name"),
-  email: varchar("email", { length: 320 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  username: text("username").unique(),
+  passwordHash: text("passwordHash"),
+  openId: text("openId").unique(),
+  email: text("email"),
+  role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).default(now).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).default(now).notNull(),
+  lastSignedIn: integer("lastSignedIn", { mode: "timestamp_ms" }).default(now).notNull(),
 });
-
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// App settings (key-value store for Drive API key, folder ID, etc.)
-export const settings = mysqlTable("settings", {
-  id: int("id").autoincrement().primaryKey(),
-  key: varchar("key", { length: 128 }).notNull().unique(),
+// ─── Settings ────────────────────────────────────────────────────────────────
+export const settings = sqliteTable("settings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  key: text("key").notNull().unique(),
   value: text("value"),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).default(now).notNull(),
 });
-
 export type Setting = typeof settings.$inferSelect;
 
-// Top-level Drive categories (derived from folder structure)
-export const categories = mysqlTable("categories", {
-  id: int("id").autoincrement().primaryKey(),
-  driveId: varchar("driveId", { length: 128 }).notNull().unique(),
-  name: varchar("name", { length: 255 }).notNull(),
-  customLabel: varchar("customLabel", { length: 255 }),
-  parentDriveId: varchar("parentDriveId", { length: 128 }),
+// ─── Categories ──────────────────────────────────────────────────────────────
+export const categories = sqliteTable("categories", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  driveId: text("driveId").unique(),
+  name: text("name").notNull(),
+  customLabel: text("customLabel"),
+  parentDriveId: text("parentDriveId"),
   path: text("path"),
-  sortOrder: int("sortOrder").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  sortOrder: integer("sortOrder").default(0).notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).default(now).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).default(now).notNull(),
 });
-
 export type Category = typeof categories.$inferSelect;
 
-// Individual 3D model entries
-export const models = mysqlTable("models", {
-  id: int("id").autoincrement().primaryKey(),
-  driveId: varchar("driveId", { length: 128 }).notNull().unique(),
-  name: varchar("name", { length: 512 }).notNull(),
-  categoryId: int("categoryId"),
+// ─── Models ──────────────────────────────────────────────────────────────────
+export const models = sqliteTable("models", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  driveId: text("driveId").unique(),
+  name: text("name").notNull(),
+  categoryId: integer("categoryId"),
   path: text("path"),
-  // JSON array of { id, name, thumbnailLink, webViewLink }
-  images: json("images").$type<DriveImage[]>().default([]),
-  // JSON array of { id, name, size, webViewLink, webContentLink, mimeType }
-  modelFiles: json("modelFiles").$type<DriveFile[]>().default([]),
-  fileCount: int("fileCount").default(0),
-  imageCount: int("imageCount").default(0),
-  // First image thumbnail for card display
+  images: text("images", { mode: "json" }).$type<DriveImage[]>().default([]),
+  modelFiles: text("modelFiles", { mode: "json" }).$type<DriveFile[]>().default([]),
+  files: text("files", { mode: "json" }).$type<DriveFile[]>().default([]),
+  fileCount: integer("fileCount").default(0),
+  imageCount: integer("imageCount").default(0),
   thumbnailUrl: text("thumbnailUrl"),
-  // AI-selected best image URL for card/hero display
   heroImage: text("heroImage"),
-  // How the hero image was set: 'ai' = auto-picked, 'manual' = owner override
-  heroImageSource: mysqlEnum("heroImageSource", ["ai", "manual"]),
-  // Original folder creation date from Google Drive (not the scan date)
-  driveCreatedAt: timestamp("driveCreatedAt"),
+  heroImageSource: text("heroImageSource", { enum: ["ai", "manual"] }),
+  driveCreatedAt: integer("driveCreatedAt", { mode: "timestamp_ms" }),
   customNotes: text("customNotes"),
-  isFavorite: boolean("isFavorite").default(false),
-  // When set, auto-tagger will skip this model (tags were manually curated)
-  tagsLockedAt: timestamp("tagsLockedAt"),
-  lastScanned: timestamp("lastScanned").defaultNow(),
-  // Which library root path this model was scanned from
+  isFavorite: integer("isFavorite", { mode: "boolean" }).default(false),
+  tagsLockedAt: integer("tagsLockedAt", { mode: "timestamp_ms" }),
+  lastScanned: integer("lastScanned", { mode: "timestamp_ms" }).default(now),
   rootPath: text("rootPath"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).default(now).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).default(now).notNull(),
 });
-
 export type Model = typeof models.$inferSelect;
 export type InsertModel = typeof models.$inferInsert;
 
-// Tags
-export const tags = mysqlTable("tags", {
-  id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 128 }).notNull().unique(),
-  color: varchar("color", { length: 32 }).default("#6366f1"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+// ─── Tags ─────────────────────────────────────────────────────────────────────
+export const tags = sqliteTable("tags", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().unique(),
+  color: text("color").default("#6366f1"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).default(now).notNull(),
 });
-
 export type Tag = typeof tags.$inferSelect;
 
-// Model <-> Tag join table
-export const modelTags = mysqlTable("model_tags", {
-  id: int("id").autoincrement().primaryKey(),
-  modelId: int("modelId").notNull(),
-  tagId: int("tagId").notNull(),
+// ─── Model <-> Tag join ───────────────────────────────────────────────────────
+export const modelTags = sqliteTable("model_tags", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  modelId: integer("modelId").notNull(),
+  tagId: integer("tagId").notNull(),
 });
-
 export type ModelTag = typeof modelTags.$inferSelect;
 
-// Scan log
-export const scanLogs = mysqlTable("scan_logs", {
-  id: int("id").autoincrement().primaryKey(),
-  status: mysqlEnum("status", ["running", "completed", "failed"]).default("running").notNull(),
-  modelsFound: int("modelsFound").default(0),
-  categoriesFound: int("categoriesFound").default(0),
+// ─── Scan Logs ────────────────────────────────────────────────────────────────
+export const scanLogs = sqliteTable("scan_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  status: text("status", { enum: ["running", "completed", "failed"] }).default("running").notNull(),
+  modelsFound: integer("modelsFound").default(0),
+  categoriesFound: integer("categoriesFound").default(0),
   errorMessage: text("errorMessage"),
-  startedAt: timestamp("startedAt").defaultNow().notNull(),
-  completedAt: timestamp("completedAt"),
+  startedAt: integer("startedAt", { mode: "timestamp_ms" }).default(now).notNull(),
+  completedAt: integer("completedAt", { mode: "timestamp_ms" }),
 });
-
 export type ScanLog = typeof scanLogs.$inferSelect;
 
-// Access control: allowlist of approved users
-export const accessRequests = mysqlTable("access_requests", {
-  id: int("id").autoincrement().primaryKey(),
-  email: varchar("email", { length: 320 }).notNull().unique(),
+// ─── Access Requests ──────────────────────────────────────────────────────────
+export const accessRequests = sqliteTable("access_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
   name: text("name"),
-  openId: varchar("openId", { length: 64 }),
-  status: mysqlEnum("status", ["pending", "approved", "denied"]).default("pending").notNull(),
-  preAdded: boolean("preAdded").default(false).notNull(),
-  requestedAt: timestamp("requestedAt").defaultNow().notNull(),
-  reviewedAt: timestamp("reviewedAt"),
+  openId: text("openId"),
+  status: text("status", { enum: ["pending", "approved", "denied"] }).default("pending").notNull(),
+  preAdded: integer("preAdded", { mode: "boolean" }).default(false).notNull(),
+  requestedAt: integer("requestedAt", { mode: "timestamp_ms" }).default(now).notNull(),
+  reviewedAt: integer("reviewedAt", { mode: "timestamp_ms" }),
 });
-
 export type AccessRequest = typeof accessRequests.$inferSelect;
 export type InsertAccessRequest = typeof accessRequests.$inferInsert;
 
-// Shared file types (compatible with both local filesystem and Google Drive sources)
+// ─── Library Paths ────────────────────────────────────────────────────────────
+export const libraryPaths = sqliteTable("library_paths", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  path: text("path").notNull(),
+  label: text("label").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
+  scanDepth: integer("scanDepth").default(2).notNull(),
+  sortOrder: integer("sortOrder").default(0).notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).default(now).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).default(now).notNull(),
+});
+export type LibraryPath = typeof libraryPaths.$inferSelect;
+export type InsertLibraryPath = typeof libraryPaths.$inferInsert;
+
+// ─── Resources ────────────────────────────────────────────────────────────────
+export const resources = sqliteTable("resources", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  logoUrl: text("logoUrl"),
+  description: text("description"),
+  sortOrder: integer("sortOrder").default(0).notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).default(now).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).default(now).notNull(),
+});
+export type Resource = typeof resources.$inferSelect;
+export type InsertResource = typeof resources.$inferInsert;
+
+// ─── Shared file types ────────────────────────────────────────────────────────
 export interface DriveImage {
-  /** Local: relative path; Drive: Google Drive file ID */
   fileId: string;
   name: string;
   thumbnailLink: string;
   webContentLink: string;
   mimeType: string;
-  /** Drive-only optional fields */
   id?: string;
   webViewLink?: string;
+  absPath?: string; // absolute local filesystem path — stored in DB so thumbnail picker can read file bytes
 }
 
 export interface DriveFile {
-  /** Local: relative path; Drive: Google Drive file ID */
   fileId: string;
   name: string;
   size: string;
   webContentLink: string;
   mimeType: string;
-  /** Drive-only optional fields */
   id?: string;
   webViewLink?: string;
 }
-
-// ─── Library Paths (multiple root folders from different drives) ─────────────
-export const libraryPaths = mysqlTable("library_paths", {
-  id: int("id").autoincrement().primaryKey(),
-  path: text("path").notNull(),
-  label: varchar("label", { length: 128 }).notNull(),
-  enabled: boolean("enabled").default(true).notNull(),
-  sortOrder: int("sortOrder").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export type LibraryPath = typeof libraryPaths.$inferSelect;
-export type InsertLibraryPath = typeof libraryPaths.$inferInsert;
-
-// ─── Resources ───────────────────────────────────────────────────────────────
-export const resources = mysqlTable("resources", {
-  id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  url: text("url").notNull(),
-  logoUrl: text("logoUrl"),
-  description: text("description"),
-  sortOrder: int("sortOrder").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export type Resource = typeof resources.$inferSelect;
-export type InsertResource = typeof resources.$inferInsert;

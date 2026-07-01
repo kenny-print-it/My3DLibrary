@@ -1,68 +1,12 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "sqlite",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1782303106549,
-      "tag": "0000_easy_slipstream",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1782303243190,
-      "tag": "0001_right_the_watchers",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1782318539536,
-      "tag": "0002_silky_stellaris",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1782330654309,
-      "tag": "0003_faithful_hedge_knight",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1782331944994,
-      "tag": "0004_cold_talon",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1782336152780,
-      "tag": "0005_oval_gorilla_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "5",
-      "when": 1782336485697,
-      "tag": "0006_cold_daredevil",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "5",
-      "when": 1782472115101,
-      "tag": "0007_dashing_true_believers",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "5",
-      "when": 1782475239210,
-      "tag": "0008_awesome_juggernaut",
+      "version": "6",
+      "when": 1782510385565,
+      "tag": "0000_purple_garia",
       "breakpoints": true
     }
   ]

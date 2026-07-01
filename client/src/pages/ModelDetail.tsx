@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Heart, ExternalLink, Download, Box, ChevronLeft, ChevronRight,
-  Tag, Plus, X, Pencil, Check, FolderOpen, FileBox, Archive, FileText, File, Star
+  Tag, Plus, X, Pencil, Check, FolderOpen, FileBox, Archive, FileText, File, Star, Copy
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import STLViewer from "@/components/STLViewer";
@@ -159,12 +159,14 @@ export default function ModelDetail() {
 
   const images: any[] = model.images as any[] || [];
   const heroImageUrl: string | null = (model as any).heroImage || null;
-  // Find the active image index matching the current heroImage (match by fileId)
+  // Find the active image index matching the current heroImage
+  // For local files: heroImage is the thumbnailLink (/local-files/...) or webContentLink
+  // For Drive files: heroImage is /api/drive-image/{id}
   const heroIdx = heroImageUrl
     ? images.findIndex((img) =>
-        heroImageUrl.includes(img.id) ||
         img.thumbnailLink === heroImageUrl ||
-        heroImageUrl === `/api/drive-image/${img.id}`
+        img.webContentLink === heroImageUrl ||
+        (img.id && (heroImageUrl.includes(img.id) || heroImageUrl === `/api/drive-image/${img.id}`))
       )
     : -1;
   // First STL for viewer fallback
@@ -306,7 +308,7 @@ export default function ModelDetail() {
                 {images.map((img, i) => {
                   const isHero = i === heroIdx;
                   return (
-                    <div key={img.id} className="relative shrink-0 group/thumb">
+                    <div key={img.fileId || img.id || i} className="relative shrink-0 group/thumb">
                       <button
                         onClick={() => setActiveImg(i)}
                         className={cn(
@@ -331,9 +333,10 @@ export default function ModelDetail() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Store the proxy URL as heroImage so it never expires
-                            const heroUrl = `/api/drive-image/${img.id}`;
-                            setHeroImage.mutate({ id: modelId, heroImage: heroUrl });
+                            // FIX: For local files use thumbnailLink (the /local-files/... URL) directly.
+                            // For Drive files use the proxy URL. img.id is undefined for local files.
+                            const heroUrl = img.thumbnailLink || img.webContentLink || (img.id ? `/api/drive-image/${img.id}` : "");
+                            if (heroUrl) setHeroImage.mutate({ id: modelId, heroImage: heroUrl });
                           }}
                           className="absolute inset-0 rounded-lg bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex flex-col items-center justify-center gap-0.5 text-white text-[9px] font-medium"
                           title="Set as hero image"
@@ -355,17 +358,56 @@ export default function ModelDetail() {
               <FileBox className="w-4 h-4 text-muted-foreground" />
               <h3 className="text-sm font-medium text-foreground">Files</h3>
               <span className="text-xs text-muted-foreground">{modelFiles.length} file{modelFiles.length !== 1 ? "s" : ""}</span>
-              {modelFiles.length > 0 && (
-                <a
-                  href={`/api/download/zip/${modelId}`}
-                  download
-                  className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-                  title="Download all files as ZIP"
-                >
-                  <Archive className="w-3.5 h-3.5" />
-                  Download All (.zip)
-                </a>
-              )}
+              <div className="ml-auto flex items-center gap-2">
+                {model.localFolderPath && (
+                  <>
+                    <button
+                      onClick={() => {
+                        console.log('[Open Folder] path:', model.localFolderPath);
+                        fetch('/api/open-folder', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ path: model.localFolderPath }),
+                        })
+                          .then(async (r) => {
+                            const data = await r.json().catch(() => ({}));
+                            if (!r.ok) toast.error(`Could not open folder: ${data.error || r.statusText}`);
+                            else toast.info('Folder opened — check your taskbar if it opened behind this window');
+                          })
+                          .catch((err) => toast.error(`Network error: ${err.message}`));
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted hover:bg-accent text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
+                      title="Open model folder in Windows Explorer"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      Open Folder
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(model.localFolderPath || '').then(() => {
+                          toast.success('Path copied to clipboard');
+                        }).catch(() => toast.error('Could not copy path'));
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted hover:bg-accent text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
+                      title="Copy folder path to clipboard"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      Copy Path
+                    </button>
+                  </>
+                )}
+                {modelFiles.length > 0 && (
+                  <a
+                    href={`/api/download/zip/${modelId}`}
+                    download
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                    title="Download all files as ZIP"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    Download All (.zip)
+                  </a>
+                )}
+              </div>
             </div>
             {modelFiles.length === 0 ? (
               <div className="px-4 py-6 text-center text-sm text-muted-foreground">No model files found in this folder or its subfolders</div>
@@ -377,14 +419,14 @@ export default function ModelDetail() {
                   const extColors: Record<string, string> = { STL: "#6366f1", OBJ: "#8b5cf6", "3MF": "#14b8a6", STEP: "#f97316", STP: "#f97316", GCODE: "#22c55e", PDF: "#ef4444", TXT: "#94a3b8", MD: "#94a3b8", DOC: "#3b82f6", DOCX: "#3b82f6", ZIP: "#eab308", PNG: "#22c55e", JPG: "#22c55e", JPEG: "#22c55e" };
                   const extColor = extColors[fileExt] || "#6b7280";
                   return (
-                    <div key={file.id} className="flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors group">
+                    <div key={file.id || file.fileId} className="flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors group">
                       <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: extColor + "22", color: extColor }}>{fileExt}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground truncate">{file.name}</p>
                         <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {/* Open in Slicer — uses my3dlibrary:// protocol handler */}
+                        {/* Open file with default app via server-side /api/open-file */}
                         {(file.absPath || file.localUrl) && (
                           <a
                             href="#"
@@ -393,7 +435,11 @@ export default function ModelDetail() {
                             onClick={(e) => {
                               e.preventDefault();
                               const p = file.absPath || file.localUrl || "";
-                              window.location.href = `my3dlibrary://open?path=${encodeURIComponent(p)}`;
+                              fetch('/api/open-file', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: p }),
+                              });
                             }}
                           >
                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -425,7 +471,7 @@ export default function ModelDetail() {
                 <div className="flex items-center gap-1.5 mt-1.5 text-sm text-muted-foreground">
                   <FolderOpen className="w-3.5 h-3.5 shrink-0" />
                   {editingCatLabel ? (
-                    <form onSubmit={(e) => { e.preventDefault(); if (catLabelValue.trim()) updateCategoryLabel.mutate({ driveId: category.driveId, customLabel: catLabelValue.trim() }); }} className="flex items-center gap-1">
+                    <form onSubmit={(e) => { e.preventDefault(); if (catLabelValue.trim()) updateCategoryLabel.mutate({ driveId: category.driveId ?? "", customLabel: catLabelValue.trim() }); }} className="flex items-center gap-1">
                       <input autoFocus value={catLabelValue} onChange={(e) => setCatLabelValue(e.target.value)} className="text-sm bg-muted border border-border rounded px-2 py-0.5 text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-40" placeholder="Custom label…" />
                       <button type="submit" className="p-1 text-primary hover:text-primary/80"><Check className="w-3.5 h-3.5" /></button>
                       <button type="button" onClick={() => setEditingCatLabel(false)} className="p-1 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
@@ -560,19 +606,10 @@ export default function ModelDetail() {
             )}
           </div>
 
-          {/* Model path info + Show in Explorer */}
-          <div className="flex items-center gap-2 w-full py-2.5 px-3 rounded-lg border border-border/50 text-sm text-muted-foreground group hover:border-border transition-colors">
+          {/* Model path info */}
+          <div className="flex items-center gap-2 w-full py-2.5 px-3 rounded-lg border border-border/50 text-sm text-muted-foreground">
             <FolderOpen className="w-4 h-4 shrink-0" />
             <span className="truncate text-xs font-mono flex-1">{model.localFolderPath || model.path || model.driveId}</span>
-            {model.localFolderPath && (
-              <button
-                onClick={() => { window.location.href = `my3dlibrary://explore?path=${encodeURIComponent(model.localFolderPath!)}`; }}
-                className="shrink-0 text-xs px-2 py-0.5 rounded bg-muted hover:bg-accent text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100"
-                title="Open this folder in Windows Explorer for drag-and-drop"
-              >
-                Show in Explorer
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -598,7 +635,6 @@ export default function ModelDetail() {
             alt={images[activeImg]?.name}
             className="max-w-[90vw] max-h-[90vh] object-contain"
             onClick={(e) => e.stopPropagation()}
-
           />
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm">
             {activeImg + 1} / {images.length} — {images[activeImg].name}

@@ -3,7 +3,8 @@
 import { ENV } from "./env";
 
 export function isLLMConfigured(): boolean {
-  return Boolean(ENV.llmApiUrl && ENV.llmApiKey);
+  // Ollama and other local providers don't need an API key — only the URL is required.
+  return Boolean(ENV.llmApiUrl);
 }
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
@@ -224,8 +225,10 @@ const resolveApiUrl = () => {
 };
 
 const assertApiKey = () => {
-  if (!ENV.llmApiKey) {
-    throw new Error("LLM not configured. Set LLM_API_KEY in your .env file.");
+  // API key is optional — Ollama and local providers don't require one.
+  // Only the URL is mandatory.
+  if (!ENV.llmApiUrl) {
+    throw new Error("LLM not configured. Set LLM_API_URL in your .env file.");
   }
 };
 
@@ -368,8 +371,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     messages: messages.map(normalizeMessage),
   };
 
-  if (model) {
-    payload.model = model;
+  // Always include the model field — Ollama (and most local LLMs) require it.
+  // Fall back to ENV.llmModel (set from DB settings at startup) when the caller
+  // doesn't specify an explicit model.
+  const resolvedModel = model || ENV.llmModel;
+  if (resolvedModel) {
+    payload.model = resolvedModel;
   }
 
   if (tools && tools.length > 0) {
@@ -411,7 +418,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.llmApiKey}`,
+      ...(ENV.llmApiKey ? { authorization: `Bearer ${ENV.llmApiKey}` } : {}),
     },
     body: JSON.stringify(payload),
   });
@@ -445,7 +452,7 @@ export async function listLLMModels(): Promise<ModelsResponse> {
   const url = `${ENV.llmApiUrl.replace(/\/+$/, "")}/v1/models`;
 
   const response = await fetchWithBackoff(url, {
-    headers: { authorization: `Bearer ${ENV.llmApiKey}` },
+    headers: { ...(ENV.llmApiKey ? { authorization: `Bearer ${ENV.llmApiKey}` } : {}) },
   });
 
   if (!response.ok) {

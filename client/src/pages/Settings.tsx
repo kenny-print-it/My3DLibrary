@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import {
-  Settings as SettingsIcon, FolderOpen, RefreshCw, Tag, Trash2, Plus, Users,
-  ShieldCheck, ShieldX, UserCheck, UserX, Zap, Image as ImageIcon,
-  Lock, Pencil, Save, Key, Eye, EyeOff,
+  Settings as SettingsIcon, FolderOpen, RefreshCw, Tag, Trash2, Plus,
+  Zap, Image as ImageIcon,
+  Lock, Pencil, Save, Key, Eye, EyeOff, ChevronRight,
+  HelpCircle, X, ArrowLeft, Folder, ToggleLeft, ToggleRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -13,19 +14,258 @@ const TAG_COLORS = [
   "#eab308", "#22c55e", "#14b8a6", "#06b6d4", "#3b82f6",
 ];
 
-type SettingsTab = "library" | "tags" | "access";
+type SettingsTab = "library" | "tags";
 
+// ── Folder Browser Dialog ──────────────────────────────────────────────────
+function FolderBrowserDialog({
+  open,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (path: string) => void;
+}) {
+  const [browsePath, setBrowsePath] = useState<string | undefined>(undefined);
+
+  const { data: browseData, isLoading: browseLoading, error: browseError } = trpc.settings.browseFolder.useQuery(
+    { path: browsePath },
+    { enabled: open }
+  );
+
+  const handleNavigate = (path: string) => setBrowsePath(path);
+  const handleUp = () => {
+    if (browseData?.parent != null) setBrowsePath(browseData.parent);
+  };
+  const handleSelect = () => {
+    if (browseData?.current) {
+      onSelect(browseData.current);
+      onClose();
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "80vh" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+          <div className="flex items-center gap-2">
+            <FolderOpen className="w-5 h-5 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Browse for Folder</h2>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Current path */}
+        <div className="px-5 py-2.5 border-b border-border/50 bg-secondary/50 flex items-center gap-2 min-h-[40px]">
+          {browseData?.parent != null && (
+            <button
+              onClick={handleUp}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Up
+            </button>
+          )}
+          <span className="text-xs font-mono text-muted-foreground truncate">
+            {browseData?.current || "Select a drive or folder"}
+          </span>
+        </div>
+
+        {/* Folder list */}
+        <div className="flex-1 overflow-y-auto">
+          {browseLoading && (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" /> Loading…
+            </div>
+          )}
+          {browseError && (
+            <div className="px-5 py-4 text-sm text-destructive">
+              {browseError.message}
+            </div>
+          )}
+          {!browseLoading && browseData?.entries?.length === 0 && (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+              No sub-folders found in this location.
+            </div>
+          )}
+          {!browseLoading && browseData?.entries?.map((entry) => (
+            <button
+              key={entry.path}
+              onClick={() => handleNavigate(entry.path)}
+              className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-accent/50 transition-colors text-left group"
+            >
+              <Folder className="w-4 h-4 text-primary shrink-0" />
+              <span className="flex-1 text-sm text-foreground truncate">{entry.name}</span>
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+            </button>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-border/50 flex items-center justify-between gap-3">
+          <span className="text-xs text-muted-foreground truncate flex-1">
+            {browseData?.current
+              ? <><span className="font-medium text-foreground">Selected:</span> {browseData.current}</>
+              : "Navigate into a folder, then click Select"}
+          </span>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border/50 bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSelect}
+              disabled={!browseData?.current}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground disabled:opacity-40 transition-opacity hover:opacity-90"
+            >
+              Select This Folder
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── AI Setup Guide Dialog ──────────────────────────────────────────────────
+function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "85vh" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">AI Setup Guide</h2>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 text-sm">
+
+          {/* What AI does */}
+          <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3">
+            <p className="text-foreground font-medium mb-1">What does AI do in My3DLibrary?</p>
+            <ul className="text-muted-foreground space-y-1 list-disc list-inside text-xs">
+              <li><strong>Auto-tagging</strong> — looks at your model images and suggests tags like "fantasy", "vehicle", "miniature"</li>
+              <li><strong>Thumbnail selection</strong> — picks the best render image as the hero image for each model</li>
+            </ul>
+            <p className="text-muted-foreground text-xs mt-2">AI is completely optional. Your library works fine without it.</p>
+          </div>
+
+          {/* Option A: Ollama */}
+          <div>
+            <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">A</span>
+              Ollama (Free, runs on your PC)
+            </h3>
+            <div className="space-y-2.5 text-muted-foreground text-xs">
+              <p>Ollama runs AI models locally — no internet, no subscription required. You need a reasonably modern PC (8GB+ RAM recommended).</p>
+
+              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
+                <p className="font-medium text-foreground">Step 1 — Place ollama.exe in the app folder</p>
+                <p>Download <strong>ollama.exe</strong> from <span className="font-mono text-primary">ollama.com/download</span> and place it inside the <span className="font-mono">ollama\</span> folder next to <span className="font-mono">My3DLibrary.exe</span>.</p>
+                <p className="text-amber-400/90">⚠ The app looks for <span className="font-mono">ollama\ollama.exe</span> — it must be in that subfolder, not the root.</p>
+              </div>
+
+              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
+                <p className="font-medium text-foreground">Step 2 — Pull a vision model</p>
+                <p>Open a Command Prompt, navigate to the <span className="font-mono">ollama\</span> folder, and run:</p>
+                <code className="block bg-black/40 rounded px-2 py-1.5 font-mono text-green-400 text-[11px]">ollama.exe pull llama3.2-vision</code>
+                <p>This downloads the model (~7 GB). You only need to do this once.</p>
+              </div>
+
+              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
+                <p className="font-medium text-foreground">Step 3 — Restart My3DLibrary</p>
+                <p>Close and reopen the app. Ollama starts automatically in the background.</p>
+              </div>
+
+              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
+                <p className="font-medium text-foreground">Step 4 — Enter these settings below</p>
+                <div className="space-y-1">
+                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:11434</span></p>
+                  <p><span className="font-medium text-foreground">API Key:</span> leave blank</p>
+                  <p><span className="font-medium text-foreground">Model:</span> <span className="font-mono">llama3.2-vision</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Option B: OpenAI */}
+          <div>
+            <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-secondary border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">B</span>
+              OpenAI (Paid, cloud-based)
+            </h3>
+            <div className="space-y-2 text-muted-foreground text-xs">
+              <p>If you have an OpenAI API key, you can use GPT-4o for better results. This costs a small amount per model scanned.</p>
+              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1">
+                <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://api.openai.com/v1</span></p>
+                <p><span className="font-medium text-foreground">API Key:</span> your <span className="font-mono">sk-…</span> key from platform.openai.com</p>
+                <p><span className="font-medium text-foreground">Model:</span> <span className="font-mono">gpt-4o-mini</span></p>
+              </div>
+            </div>
+          </div>
+
+          {/* Option C: LM Studio */}
+          <div>
+            <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-secondary border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">C</span>
+              LM Studio (Free, GUI-based)
+            </h3>
+            <div className="space-y-2 text-muted-foreground text-xs">
+              <p>LM Studio is a desktop app that lets you run local models with a friendly interface. Start the local server in LM Studio, then use:</p>
+              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1">
+                <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:1234/v1</span></p>
+                <p><span className="font-medium text-foreground">API Key:</span> leave blank</p>
+                <p><span className="font-medium text-foreground">Model:</span> the model name shown in LM Studio</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div className="px-5 py-4 border-t border-border/50">
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            Got it — close guide
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Settings Component ────────────────────────────────────────────────
 export default function Settings() {
   const utils = trpc.useUtils();
   const [activeTab, setActiveTab] = useState<SettingsTab>("library");
 
   // Library path settings
   const { data: settings } = trpc.settings.get.useQuery();
+  const { data: libraryPaths = [], refetch: refetchLibraryPaths } = trpc.settings.libraryPaths.useQuery();
   const { data: scanStatus, refetch: refetchScanStatus } = trpc.scan.status.useQuery(undefined, {
     refetchInterval: (query) => (query.state.data?.inProgress ? 2000 : false),
   });
-  const [libraryPath, setLibraryPath] = useState("");
-  const [isLibraryEditing, setIsLibraryEditing] = useState(false);
+  // Multi-folder state
+  const [showAddFolder, setShowAddFolder] = useState(false);
+  const [newFolderPath, setNewFolderPath] = useState("");
+  const [newFolderLabel, setNewFolderLabel] = useState("");
+  const [newFolderScanDepth, setNewFolderScanDepth] = useState<2 | 3>(2);
+  const [showFolderBrowser, setShowFolderBrowser] = useState(false);
+  const [folderBrowserTarget, setFolderBrowserTarget] = useState<"new">("new");
 
   // LLM settings
   const [llmApiUrl, setLlmApiUrl] = useState("");
@@ -33,6 +273,7 @@ export default function Settings() {
   const [llmModel, setLlmModel] = useState("");
   const [showLlmKey, setShowLlmKey] = useState(false);
   const [isLlmEditing, setIsLlmEditing] = useState(false);
+  const [showAIGuide, setShowAIGuide] = useState(false);
 
   // Tags
   const { data: allTags = [] } = trpc.tags.list.useQuery();
@@ -48,19 +289,10 @@ export default function Settings() {
     refetchInterval: rePickingAny ? 2000 : false,
   });
 
-  // Access control — local users
-  const { data: allUsers = [] } = trpc.access.list.useQuery({ status: "all" });
-  const pendingUsers = allUsers.filter((u: any) => u.status === "pending");
-  const approvedUsers = allUsers.filter((u: any) => u.status === "approved");
-  const deniedUsers = allUsers.filter((u: any) => u.status === "denied");
-
-  // New user form
-  const [newUsername, setNewUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  // (No user management in portable mode)
 
   useEffect(() => {
     if (settings) {
-      setLibraryPath((settings as any).library_path || "");
       setLlmApiUrl((settings as any).llm_api_url || "");
       setLlmApiKey((settings as any).llm_api_key || "");
       setLlmModel((settings as any).llm_model || "");
@@ -70,6 +302,32 @@ export default function Settings() {
   const updateSettings = trpc.settings.update.useMutation({
     onSuccess: () => { toast.success("Settings saved"); utils.settings.get.invalidate(); },
     onError: () => toast.error("Failed to save settings"),
+  });
+
+  const addLibraryPath = trpc.settings.addLibraryPath.useMutation({
+    onSuccess: () => {
+      toast.success("Folder added");
+      refetchLibraryPaths();
+      setShowAddFolder(false);
+      setNewFolderPath("");
+      setNewFolderLabel("");
+    },
+    onError: (e) => toast.error(e.message || "Failed to add folder"),
+  });
+
+  const removeLibraryPath = trpc.settings.removeLibraryPath.useMutation({
+    onSuccess: () => { toast.success("Folder removed"); refetchLibraryPaths(); },
+    onError: () => toast.error("Failed to remove folder"),
+  });
+
+  const toggleLibraryPath = trpc.settings.toggleLibraryPath.useMutation({
+    onSuccess: () => refetchLibraryPaths(),
+    onError: () => toast.error("Failed to toggle folder"),
+  });
+
+  const updateLibraryPathDepth = trpc.settings.updateLibraryPathDepth.useMutation({
+    onSuccess: () => refetchLibraryPaths(),
+    onError: () => toast.error("Failed to update scan depth"),
   });
 
   const startScan = trpc.scan.start.useMutation({
@@ -133,514 +391,546 @@ export default function Settings() {
     onSuccess: () => { utils.tags.list.invalidate(); toast.success("Tag deleted"); },
   });
 
-  const approveUser = trpc.access.approve.useMutation({
-    onSuccess: () => { utils.access.list.invalidate(); toast.success("User approved."); },
-  });
-
-  const denyUser = trpc.access.deny.useMutation({
-    onSuccess: () => { utils.access.list.invalidate(); toast.success("User denied."); },
-  });
-
-  const removeUser = trpc.access.remove.useMutation({
-    onSuccess: () => { utils.access.list.invalidate(); toast.success("User removed."); },
-  });
-
-  const createUser = trpc.auth.createUser.useMutation({
-    onSuccess: () => {
-      utils.access.list.invalidate();
-      setNewUsername("");
-      setNewPassword("");
-      toast.success("User created — they can now log in.");
-    },
-    onError: (e: { message?: string }) => toast.error(e.message || "Failed to create user"),
-  });
-
   const lastScan = scanStatus?.lastScan;
-  const pendingCount = pendingUsers.length;
 
-  const tabs: { id: SettingsTab; label: string; icon: React.ReactNode; badge?: number }[] = [
+  const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: "library", label: "Library", icon: <FolderOpen className="w-4 h-4" /> },
     { id: "tags", label: "Tags", icon: <Tag className="w-4 h-4" /> },
-    { id: "access", label: "Users", icon: <Users className="w-4 h-4" />, badge: pendingCount },
   ];
 
   return (
-    <div className="container py-8 max-w-2xl">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-          <SettingsIcon className="w-5 h-5 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Settings</h1>
-          <p className="text-sm text-muted-foreground">Manage your library configuration and access</p>
-        </div>
-      </div>
+    <>
+      {/* Dialogs */}
+      <FolderBrowserDialog
+        open={showFolderBrowser}
+        onClose={() => setShowFolderBrowser(false)}
+        onSelect={(p) => {
+          setNewFolderPath(p);
+          if (!newFolderLabel) setNewFolderLabel(p.split(/[\/\\]/).filter(Boolean).pop() || p);
+        }}
+      />
+      <AISetupGuideDialog
+        open={showAIGuide}
+        onClose={() => setShowAIGuide(false)}
+      />
 
-      {/* Tab bar */}
-      <div className="flex gap-1 p-1 rounded-xl bg-card border border-border/50 mb-6">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "relative flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all",
-              activeTab === tab.id
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-          >
-            {tab.icon}
-            <span className="hidden sm:inline">{tab.label}</span>
-            {tab.badge != null && tab.badge > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-[10px] font-bold text-black flex items-center justify-center">
-                {tab.badge}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Library Tab ── */}
-      {activeTab === "library" && (
-        <div className="space-y-6">
-
-          {/* Library path */}
-          <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
-            <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Library Folder</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {isLibraryEditing ? "Enter the full path to your models folder." : "Locked — click Edit to make changes."}
-                </p>
-              </div>
-              <button
-                onClick={() => setIsLibraryEditing((v) => !v)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
-                  isLibraryEditing
-                    ? "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20"
-                    : "bg-secondary border-border/50 text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {isLibraryEditing ? <><Lock className="w-3.5 h-3.5" /> Lock</> : <><Pencil className="w-3.5 h-3.5" /> Edit</>}
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              {!isLibraryEditing ? (
-                <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary border border-border/50">
-                  <FolderOpen className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Library Path</p>
-                    <p className="text-sm font-mono text-foreground truncate">
-                      {(settings as any)?.library_path || <span className="text-muted-foreground italic">Not set</span>}
-                    </p>
-                  </div>
-                  <Lock className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <FolderOpen className="w-3.5 h-3.5" /> Full path to your models folder
-                    </label>
-                    <input
-                      type="text"
-                      value={libraryPath}
-                      onChange={(e) => setLibraryPath(e.target.value)}
-                      placeholder="C:\Users\Kenny\3D Models  or  /mnt/nas/models"
-                      className="w-full px-3 py-2.5 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      The folder should contain sub-folders for each collection (e.g. <span className="font-mono text-foreground">Beasts and Minis/</span>, <span className="font-mono text-foreground">Star Wars/</span>).
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => { updateSettings.mutate({ library_path: libraryPath }); setIsLibraryEditing(false); }}
-                    disabled={updateSettings.isPending || !libraryPath.trim()}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 transition-opacity hover:opacity-90"
-                  >
-                    {updateSettings.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Save & Lock
-                  </button>
-                </>
-              )}
-            </div>
-          </section>
-
-          {/* LLM settings */}
-          <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
-            <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">AI / LLM Configuration</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Used for auto-tagging and thumbnail selection. Supports any OpenAI-compatible API (OpenAI, Ollama, LM Studio, etc.).</p>
-              </div>
-              <button
-                onClick={() => setIsLlmEditing((v) => !v)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
-                  isLlmEditing
-                    ? "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20"
-                    : "bg-secondary border-border/50 text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {isLlmEditing ? <><Lock className="w-3.5 h-3.5" /> Lock</> : <><Pencil className="w-3.5 h-3.5" /> Edit</>}
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              {!isLlmEditing ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary border border-border/50">
-                    <FolderOpen className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">API URL</p>
-                      <p className="text-sm font-mono text-foreground truncate">
-                        {(settings as any)?.llm_api_url || <span className="text-muted-foreground italic">Not set (AI features disabled)</span>}
-                      </p>
-                    </div>
-                    <Lock className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
-                  </div>
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary border border-border/50">
-                    <Key className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Model</p>
-                      <p className="text-sm font-mono text-foreground truncate">
-                        {(settings as any)?.llm_model || <span className="text-muted-foreground italic">Not set</span>}
-                      </p>
-                    </div>
-                    <Lock className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">API Base URL</label>
-                    <input
-                      type="text"
-                      value={llmApiUrl}
-                      onChange={(e) => setLlmApiUrl(e.target.value)}
-                      placeholder="https://api.openai.com/v1  or  http://localhost:11434/v1"
-                      className="w-full px-3 py-2.5 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">API Key <span className="text-muted-foreground/50">(leave blank for Ollama/local)</span></label>
-                    <div className="relative">
-                      <input
-                        type={showLlmKey ? "text" : "password"}
-                        value={llmApiKey}
-                        onChange={(e) => setLlmApiKey(e.target.value)}
-                        placeholder="sk-…"
-                        className="w-full px-3 py-2.5 pr-10 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowLlmKey((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showLlmKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Model name</label>
-                    <input
-                      type="text"
-                      value={llmModel}
-                      onChange={(e) => setLlmModel(e.target.value)}
-                      placeholder="gpt-4o-mini  or  llama3.2-vision"
-                      className="w-full px-3 py-2.5 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                    />
-                  </div>
-                  <button
-                    onClick={() => {
-                      updateSettings.mutate({ llm_api_url: llmApiUrl, llm_api_key: llmApiKey, llm_model: llmModel });
-                      setIsLlmEditing(false);
-                    }}
-                    disabled={updateSettings.isPending}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 transition-opacity hover:opacity-90"
-                  >
-                    {updateSettings.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Save & Lock
-                  </button>
-                </>
-              )}
-            </div>
-          </section>
-
-          {/* Library Scan */}
-          <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
-            <div className="px-5 py-4 border-b border-border/50">
-              <h2 className="text-sm font-semibold text-foreground">Library Scan</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Scan your library folder to import or refresh models</p>
-            </div>
-            <div className="p-5 space-y-4">
-              {/* Live progress */}
-              {scanStatus?.inProgress && (() => {
-                const p = scanStatus.progress as { modelsFound: number; categoriesFound: number; totalCollections: number; currentFolder: string; phase: string } | null;
-                const total = p?.totalCollections ?? 0;
-                const scanned = p?.categoriesFound ?? 0;
-                const pct = total > 0 ? Math.min(100, Math.round((scanned / total) * 100)) : 0;
-                const phaseLabel = !p || p.phase === "discovering"
-                  ? "Discovering collections…"
-                  : p.phase === "saving"
-                  ? "Saving to database…"
-                  : p.phase === "done"
-                  ? "Finishing up…"
-                  : `Scanning "${p.currentFolder}"`;
-                return (
-                  <div className="rounded-lg bg-muted/50 px-4 py-3 space-y-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
-                      <span className="text-sm font-medium text-foreground">Running</span>
-                      {total > 0 && (
-                        <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                          {scanned} / {total} collections
-                        </span>
-                      )}
-                    </div>
-                    {total > 0 && (
-                      <div className="w-full h-1.5 rounded-full bg-border overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all duration-500 ease-out" style={{ width: `${pct}%` }} />
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground truncate">{phaseLabel}</p>
-                    {p && <p className="text-xs text-muted-foreground">{p.modelsFound} model{p.modelsFound !== 1 ? "s" : ""} found so far</p>}
-                  </div>
-                );
-              })()}
-              {/* Last scan result */}
-              {!scanStatus?.inProgress && lastScan && (
-                <div className="rounded-lg bg-muted/50 px-4 py-3 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <div className={cn("w-2 h-2 rounded-full", lastScan.status === "completed" ? "bg-green-400" : lastScan.status === "failed" ? "bg-destructive" : "bg-primary animate-pulse")} />
-                    <span className="text-sm font-medium text-foreground capitalize">{lastScan.status}</span>
-                  </div>
-                  {lastScan.status === "completed" && <p className="text-xs text-muted-foreground">{lastScan.modelsFound} models · {lastScan.categoriesFound} folders found</p>}
-                  {lastScan.status === "failed" && lastScan.errorMessage && <p className="text-xs text-destructive">{lastScan.errorMessage}</p>}
-                  {lastScan.completedAt && <p className="text-xs text-muted-foreground">Last run: {new Date(lastScan.completedAt).toLocaleString()}</p>}
-                </div>
-              )}
-              <button
-                onClick={() => startScan.mutate()}
-                disabled={scanStatus?.inProgress || startScan.isPending}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
-              >
-                <RefreshCw className={cn("w-4 h-4", (scanStatus?.inProgress || startScan.isPending) && "animate-spin")} />
-                {scanStatus?.inProgress ? "Scanning…" : "Start Scan"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* ── Tags Tab ── */}
-      {activeTab === "tags" && (
-        <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
-          <div className="px-5 py-4 border-b border-border/50">
-            <h2 className="text-sm font-semibold text-foreground">Tag Management</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Create and delete global tags for organizing your models</p>
+      <div className="container py-8 max-w-2xl">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+            <SettingsIcon className="w-5 h-5 text-primary" />
           </div>
-          <div className="p-5 space-y-4">
-            {allTags.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {allTags.map((tag: any) => (
-                  <div key={tag.id} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-sm" style={{ backgroundColor: (tag.color || "#6366f1") + "22", color: tag.color || "#6366f1", borderColor: (tag.color || "#6366f1") + "44" }}>
-                    <span>{tag.name}</span>
-                    <button onClick={() => deleteTag.mutate({ id: tag.id })} className="hover:opacity-60 transition-opacity ml-0.5"><Trash2 className="w-3 h-3" /></button>
-                  </div>
-                ))}
-              </div>
-            ) : <p className="text-sm text-muted-foreground">No tags yet.</p>}
-            {/* Re-tag All */}
-            <div className="pt-2 border-t border-border/30">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-medium text-foreground">Auto-tag all models</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Uses AI to match model names against your tag library. Runs automatically after each scan.</p>
-                </div>
-                <button onClick={() => reTagAll.mutate()} disabled={reTagging} className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 transition-colors disabled:opacity-50">
-                  {reTagging ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                  {reTagging ? "Running…" : "Re-tag All"}
-                </button>
-              </div>
-            </div>
-            {/* Re-pick Thumbnails */}
-            <div className="pt-2 border-t border-border/30 space-y-3">
-              <div>
-                <p className="text-xs font-medium text-foreground">AI thumbnail selection</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Manually set hero images are always preserved.</p>
-              </div>
-              {rePickingAny && rePickProgress && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{rePickProgress.processed} / {rePickProgress.total} processed</span>
-                    <span>{rePickProgress.updated} updated · {rePickProgress.errors} errors</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: rePickProgress.total > 0 ? `${Math.round((rePickProgress.processed / rePickProgress.total) * 100)}%` : "0%" }} />
-                  </div>
-                </div>
-              )}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground">Re-pick Unset Only</p>
-                    <p className="text-xs text-muted-foreground">Picks thumbnails only for models with no hero image yet.</p>
-                  </div>
-                  <button onClick={() => rePickUnset.mutate()} disabled={rePickingAny} className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-secondary text-foreground hover:bg-secondary/80 border border-border/50 transition-colors disabled:opacity-50">
-                    {rePickingUnset ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
-                    {rePickingUnset ? `${rePickProgress?.total ? Math.round((rePickProgress.processed / rePickProgress.total) * 100) : 0}%…` : "Re-pick Unset"}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground">Re-pick All (AI + Unset)</p>
-                    <p className="text-xs text-muted-foreground">Re-evaluates every AI-picked thumbnail plus any unset ones.</p>
-                  </div>
-                  <button onClick={() => rePickThumbnails.mutate()} disabled={rePickingAny} className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 transition-colors disabled:opacity-50">
-                    {rePickingThumbs ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
-                    {rePickingThumbs ? `${rePickProgress?.total ? Math.round((rePickProgress.processed / rePickProgress.total) * 100) : 0}%…` : "Re-pick All"}
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2 pt-2 border-t border-border/30">
-              <p className="text-xs font-medium text-muted-foreground">Create new tag</p>
-              <div className="flex gap-2">
-                <input type="text" placeholder="Tag name…" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newTagName.trim()) createTag.mutate({ name: newTagName.trim(), color: newTagColor }); }} className="flex-1 px-3 py-2 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
-                <button onClick={() => { if (newTagName.trim()) createTag.mutate({ name: newTagName.trim(), color: newTagColor }); }} disabled={!newTagName.trim() || createTag.isPending} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40">
-                  <Plus className="w-4 h-4" /> Add
-                </button>
-              </div>
-              <div className="flex gap-1.5 flex-wrap">
-                {TAG_COLORS.map((c) => (
-                  <button key={c} onClick={() => setNewTagColor(c)} className={cn("w-6 h-6 rounded-full transition-all", newTagColor === c ? "ring-2 ring-white ring-offset-1 ring-offset-card scale-110" : "")} style={{ backgroundColor: c }} />
-                ))}
-              </div>
-            </div>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Settings</h1>
+            <p className="text-sm text-muted-foreground">Manage your library configuration and access</p>
           </div>
-        </section>
-      )}
+        </div>
 
-      {/* ── Users Tab ── */}
-      {activeTab === "access" && (
-        <div className="space-y-6">
+        {/* Tab bar */}
+        <div className="flex gap-1 p-1 rounded-xl bg-card border border-border/50 mb-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "relative flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                activeTab === tab.id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
+        </div>
 
-          {/* Create new user */}
-          <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
-            <div className="px-5 py-4 border-b border-border/50">
-              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" /> Create New User
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Add a local user account. They can log in immediately with these credentials.</p>
-            </div>
-            <div className="p-5 space-y-3">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <input
-                  type="password"
-                  placeholder="Password (min 8 chars)"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <button
-                  onClick={() => { if (newUsername.trim() && newPassword.length >= 8) createUser.mutate({ username: newUsername.trim(), password: newPassword }); }}
-                  disabled={!newUsername.trim() || newPassword.length < 8 || createUser.isPending}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40"
-                >
-                  <Plus className="w-4 h-4" /> Add
-                </button>
-              </div>
-            </div>
-          </section>
+        {/* ── Library Tab ── */}
+        {activeTab === "library" && (
+          <div className="space-y-6">
 
-          {/* Pending requests */}
-          {pendingUsers.length > 0 && (
+            {/* Library Folders — multi-path */}
             <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
               <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  Pending Requests
-                </h2>
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  {pendingUsers.length} waiting
-                </span>
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">Library Folders</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Add one or more folders where your 3D models are stored.</p>
+                </div>
+                <button
+                  onClick={() => setShowAddFolder((v) => !v)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-secondary border-border/50 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Folder
+                </button>
               </div>
-              <div className="divide-y divide-border/30">
-                {pendingUsers.map((u: any) => (
-                  <div key={u.id} className="flex items-center gap-3 px-5 py-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{u.name ?? u.username ?? "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground/50">{new Date(u.requestedAt).toLocaleString()}</p>
+              <div className="p-5 space-y-3">
+                {/* Existing paths list */}
+                {libraryPaths.length === 0 && !showAddFolder && (
+                  <p className="text-sm text-muted-foreground italic text-center py-4">No folders added yet. Click "Add Folder" to get started.</p>
+                )}
+                {(libraryPaths as any[]).map((lp: any) => (
+                  <div key={lp.id} className={cn(
+                    "rounded-lg border transition-colors",
+                    lp.enabled ? "bg-secondary border-border/50" : "bg-secondary/40 border-border/30 opacity-60"
+                  )}>
+                    <div className="flex items-center gap-3 px-3 py-2.5">
+                      <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{lp.label}</p>
+                        <p className="text-[11px] font-mono text-muted-foreground truncate">{lp.path}</p>
+                      </div>
+                      <button
+                        onClick={() => toggleLibraryPath.mutate({ id: lp.id, enabled: !lp.enabled })}
+                        className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                        title={lp.enabled ? "Disable this folder" : "Enable this folder"}
+                      >
+                        {lp.enabled
+                          ? <ToggleRight className="w-5 h-5 text-primary" />
+                          : <ToggleLeft className="w-5 h-5" />}
+                      </button>
+                      <button
+                        onClick={() => { if (confirm(`Remove "${lp.label}"?`)) removeLibraryPath.mutate({ id: lp.id }); }}
+                        className="text-muted-foreground/50 hover:text-destructive transition-colors shrink-0"
+                        title="Remove folder"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button onClick={() => approveUser.mutate({ id: u.id })} disabled={approveUser.isPending} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors">
-                        <UserCheck className="w-3.5 h-3.5" /> Approve
-                      </button>
-                      <button onClick={() => denyUser.mutate({ id: u.id })} disabled={denyUser.isPending} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors">
-                        <UserX className="w-3.5 h-3.5" /> Deny
-                      </button>
+                    {/* Scan depth selector per folder */}
+                    <div className="px-3 pb-2.5 flex items-center gap-2">
+                      <span className="text-[11px] text-muted-foreground">Scan depth:</span>
+                      <div className="flex gap-1">
+                        {([2, 3] as const).map((d) => (
+                          <button
+                            key={d}
+                            onClick={() => updateLibraryPathDepth.mutate({ id: lp.id, scanDepth: d })}
+                            className={cn(
+                              "px-2 py-0.5 rounded text-[11px] font-medium border transition-colors",
+                              (lp.scanDepth ?? 2) === d
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-secondary text-muted-foreground border-border/50 hover:text-foreground"
+                            )}
+                            title={d === 2 ? "2 levels: Folder/Collection/Model" : "3 levels: Folder/Group/Collection/Model"}
+                          >
+                            {d === 2 ? "2-level" : "3-level"}
+                          </button>
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground/60">
+                        {(lp.scanDepth ?? 2) === 2
+                          ? "Each subfolder = one model"
+                          : "Subfolder → subfolder → model"}
+                      </span>
                     </div>
                   </div>
                 ))}
-              </div>
-            </section>
-          )}
 
-          {/* All users */}
-          <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
-            <div className="px-5 py-4 border-b border-border/50">
-              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-green-400" /> All Users
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">{approvedUsers.length + deniedUsers.length} user{approvedUsers.length + deniedUsers.length !== 1 ? "s" : ""}</p>
-            </div>
-            <div className="divide-y divide-border/30">
-              {[...approvedUsers, ...deniedUsers].length === 0 ? (
-                <p className="px-5 py-4 text-sm text-muted-foreground">No users yet.</p>
-              ) : [...approvedUsers, ...deniedUsers].map((u: any) => (
-                <div key={u.id} className="flex items-center gap-3 px-5 py-3">
-                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold", u.role === "admin" ? "bg-primary/10 text-primary border border-primary/20" : u.status === "approved" ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20")}>
-                    {(u.username || u.name || "?")[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">{u.username || u.name || "Unknown"}</p>
-                      {u.role === "admin" && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-medium">Admin</span>}
-                      {u.status === "approved" && u.role !== "admin" && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-medium">Approved</span>}
-                      {u.status === "denied" && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium">Denied</span>}
+                {/* Add folder form */}
+                {showAddFolder && (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+                    <p className="text-xs font-semibold text-foreground">Add a new library folder</p>
+                    {/* Google Drive tip */}
+                    <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 px-3 py-2.5 flex gap-2.5 items-start">
+                      <span className="text-blue-400 text-base leading-none mt-0.5">☁</span>
+                      <div className="text-[11px] text-muted-foreground leading-relaxed">
+                        <span className="font-semibold text-blue-400">Using Google Drive?</span>{" "}
+                        Install{" "}
+                        <a
+                          href="https://www.google.com/drive/download/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline text-blue-400 hover:text-blue-300 transition-colors"
+                        >
+                          Google Drive for Desktop
+                        </a>
+                        {" "}— it mounts your Drive as a local drive letter (e.g.{" "}
+                        <span className="font-mono">G:\</span>) so you can browse and add it here like any other folder.
+                      </div>
                     </div>
-                  </div>
-                  {u.role !== "admin" && (
-                    <div className="flex gap-2 shrink-0">
-                      {u.status === "denied" && (
-                        <button onClick={() => approveUser.mutate({ id: u.id })} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors">
-                          <ShieldCheck className="w-3 h-3" /> Approve
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground">Folder path</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newFolderPath}
+                          onChange={(e) => setNewFolderPath(e.target.value)}
+                          placeholder="G:\3d Print Files\YOSH - Cosplay"
+                          className="flex-1 px-3 py-2 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        />
+                        <button
+                          onClick={() => { setFolderBrowserTarget("new"); setShowFolderBrowser(true); }}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors shrink-0"
+                        >
+                          <Folder className="w-4 h-4" /> Browse
                         </button>
-                      )}
-                      {u.status === "approved" && (
-                        <button onClick={() => denyUser.mutate({ id: u.id })} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors">
-                          <ShieldX className="w-3 h-3" /> Revoke
-                        </button>
-                      )}
-                      <button onClick={() => removeUser.mutate({ id: u.id })} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-secondary text-muted-foreground border border-border/50 hover:text-foreground transition-colors">
-                        <Trash2 className="w-3 h-3" /> Remove
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground">Display label <span className="text-muted-foreground/50">(optional)</span></label>
+                      <input
+                        type="text"
+                        value={newFolderLabel}
+                        onChange={(e) => setNewFolderLabel(e.target.value)}
+                        placeholder="e.g. YOSH Cosplay Models"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground">Scan depth</label>
+                      <div className="flex gap-2">
+                        {([2, 3] as const).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => setNewFolderScanDepth(d)}
+                            className={cn(
+                              "flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors",
+                              newFolderScanDepth === d
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-secondary text-muted-foreground border-border/50 hover:text-foreground"
+                            )}
+                          >
+                            {d === 2 ? "2-level (Collection → Model)" : "3-level (Group → Collection → Model)"}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground/70">
+                        {newFolderScanDepth === 2
+                          ? "Each direct subfolder of your chosen folder = one model tile"
+                          : "Two levels of subfolders before model tiles — use when your folder has categories inside categories"}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const label = newFolderLabel.trim() || newFolderPath.split(/[\/\\]/).filter(Boolean).pop() || newFolderPath;
+                          addLibraryPath.mutate({ path: newFolderPath.trim(), label, scanDepth: newFolderScanDepth });
+                        }}
+                        disabled={addLibraryPath.isPending || !newFolderPath.trim()}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 transition-opacity hover:opacity-90"
+                      >
+                        {addLibraryPath.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                        Add Folder
+                      </button>
+                      <button
+                        onClick={() => { setShowAddFolder(false); setNewFolderPath(""); setNewFolderLabel(""); setNewFolderScanDepth(2); }}
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Cancel
                       </button>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* LLM settings */}
+            <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">AI / LLM Configuration</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Used for auto-tagging and thumbnail selection. Supports Ollama, OpenAI, LM Studio, and more.</p>
                 </div>
-              ))}
-            </div>
-          </section>
-        </div>
-      )}
-    </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowAIGuide(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/50 bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                    title="How to set up AI"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    Setup Guide
+                  </button>
+                  <button
+                    onClick={() => setIsLlmEditing((v) => !v)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
+                      isLlmEditing
+                        ? "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20"
+                        : "bg-secondary border-border/50 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {isLlmEditing ? <><Lock className="w-3.5 h-3.5" /> Lock</> : <><Pencil className="w-3.5 h-3.5" /> Edit</>}
+                  </button>
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                {!isLlmEditing ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary border border-border/50">
+                      <FolderOpen className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">API URL</p>
+                        <p className="text-sm font-mono text-foreground truncate">
+                          {(settings as any)?.llm_api_url || <span className="text-muted-foreground italic">Not set (AI features disabled)</span>}
+                        </p>
+                      </div>
+                      <Lock className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                    </div>
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary border border-border/50">
+                      <Key className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Model</p>
+                        <p className="text-sm font-mono text-foreground truncate">
+                          {(settings as any)?.llm_model || <span className="text-muted-foreground italic">Not set</span>}
+                        </p>
+                      </div>
+                      <Lock className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">API Base URL</label>
+                      <input
+                        type="text"
+                        value={llmApiUrl}
+                        onChange={(e) => setLlmApiUrl(e.target.value)}
+                        placeholder="https://api.openai.com/v1  or  http://localhost:11434"
+                        className="w-full px-3 py-2.5 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">API Key <span className="text-muted-foreground/50">(leave blank for Ollama/local)</span></label>
+                      <div className="relative">
+                        <input
+                          type={showLlmKey ? "text" : "password"}
+                          value={llmApiKey}
+                          onChange={(e) => setLlmApiKey(e.target.value)}
+                          placeholder="sk-…"
+                          className="w-full px-3 py-2.5 pr-10 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowLlmKey((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showLlmKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">Model name</label>
+                      <input
+                        type="text"
+                        value={llmModel}
+                        onChange={(e) => setLlmModel(e.target.value)}
+                        placeholder="gpt-4o-mini  or  llama3.2-vision"
+                        className="w-full px-3 py-2.5 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        updateSettings.mutate({ llm_api_url: llmApiUrl, llm_api_key: llmApiKey, llm_model: llmModel });
+                        setIsLlmEditing(false);
+                      }}
+                      disabled={updateSettings.isPending}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 transition-opacity hover:opacity-90"
+                    >
+                      {updateSettings.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Save & Lock
+                    </button>
+                  </>
+                )}
+              </div>
+            </section>
+
+            {/* Library Scan */}
+            <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/50">
+                <h2 className="text-sm font-semibold text-foreground">Library Scan</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Scan your library folder to import or refresh models</p>
+              </div>
+              <div className="p-5 space-y-4">
+                {/* Live progress */}
+                {scanStatus?.inProgress && (() => {
+                  const p = scanStatus.progress as { modelsFound: number; categoriesFound: number; totalCollections: number; currentFolder: string; phase: string } | null;
+                  const total = p?.totalCollections ?? 0;
+                  const scanned = p?.categoriesFound ?? 0;
+                  const pct = total > 0 ? Math.min(100, Math.round((scanned / total) * 100)) : 0;
+                  const phaseLabel = !p || p.phase === "discovering"
+                    ? "Discovering collections…"
+                    : p.phase === "saving"
+                    ? "Saving to database…"
+                    : p.phase === "done"
+                    ? "Finishing up…"
+                    : `Scanning "${p.currentFolder}"`;
+                  return (
+                    <div className="rounded-lg bg-muted/50 px-4 py-3 space-y-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
+                        <span className="text-sm font-medium text-foreground">Running</span>
+                        {total > 0 && (
+                          <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                            {scanned} / {total} collections
+                          </span>
+                        )}
+                      </div>
+                      {total > 0 && (
+                        <div className="w-full h-1.5 rounded-full bg-border overflow-hidden">
+                          <div className="h-full rounded-full bg-primary transition-all duration-500 ease-out" style={{ width: `${pct}%` }} />
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground truncate">{phaseLabel}</p>
+                      {p && <p className="text-xs text-muted-foreground">{p.modelsFound} model{p.modelsFound !== 1 ? "s" : ""} found so far</p>}
+                    </div>
+                  );
+                })()}
+                {/* Last scan result */}
+                {!scanStatus?.inProgress && lastScan && (
+                  <div className="rounded-lg bg-muted/50 px-4 py-3 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className={cn("w-2 h-2 rounded-full", lastScan.status === "completed" ? "bg-green-400" : lastScan.status === "failed" ? "bg-destructive" : "bg-primary animate-pulse")} />
+                      <span className="text-sm font-medium text-foreground capitalize">{lastScan.status}</span>
+                    </div>
+                    {lastScan.status === "completed" && <p className="text-xs text-muted-foreground">{lastScan.modelsFound} models · {lastScan.categoriesFound} folders found</p>}
+                    {lastScan.status === "failed" && lastScan.errorMessage && <p className="text-xs text-destructive">{lastScan.errorMessage}</p>}
+                    {lastScan.completedAt && <p className="text-xs text-muted-foreground">Last run: {new Date(lastScan.completedAt).toLocaleString()}</p>}
+                  </div>
+                )}
+                <button
+                  onClick={() => startScan.mutate()}
+                  disabled={startScan.isPending || scanStatus?.inProgress}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-secondary border border-border/50 text-foreground disabled:opacity-40 transition-opacity hover:bg-muted"
+                >
+                  <RefreshCw className={cn("w-4 h-4", (startScan.isPending || scanStatus?.inProgress) && "animate-spin")} />
+                  Start Scan
+                </button>
+
+                {/* Thumbnail re-pick */}
+                <div className="pt-2 border-t border-border/50 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-semibold text-foreground mb-0.5">Thumbnail Management</h3>
+                    <p className="text-xs text-muted-foreground">Re-run AI thumbnail selection across your library.</p>
+                  </div>
+                  {rePickingAny && rePickProgress && (
+                    <div className="rounded-lg bg-muted/50 px-4 py-3 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
+                        <span className="text-xs font-medium text-foreground">Running thumbnail re-pick…</span>
+                      </div>
+                      {(rePickProgress as any).total > 0 && (
+                        <div className="w-full h-1 rounded-full bg-border overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all duration-500"
+                            style={{ width: `${Math.round(((rePickProgress as any).processed / (rePickProgress as any).total) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {(rePickProgress as any).processed ?? 0} / {(rePickProgress as any).total ?? "?"} models
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => rePickThumbnails.mutate()}
+                      disabled={rePickingAny}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                    >
+                      <ImageIcon className={cn("w-3.5 h-3.5", rePickingThumbs && "animate-spin")} />
+                      Re-pick All (AI + unset)
+                    </button>
+                    <button
+                      onClick={() => rePickUnset.mutate()}
+                      disabled={rePickingAny}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                    >
+                      <ImageIcon className={cn("w-3.5 h-3.5", rePickingUnset && "animate-spin")} />
+                      Re-pick Unset Only
+                    </button>
+                  </div>
+                </div>
+
+                {/* Re-tag */}
+                <div className="pt-2 border-t border-border/50 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-semibold text-foreground mb-0.5">Auto-Tagging</h3>
+                    <p className="text-xs text-muted-foreground">Re-run AI tag suggestions for all models. Requires AI to be configured.</p>
+                  </div>
+                  <button
+                    onClick={() => reTagAll.mutate()}
+                    disabled={reTagging}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                  >
+                    <Zap className={cn("w-3.5 h-3.5", reTagging && "animate-spin")} />
+                    Re-tag All Models
+                  </button>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        )}
+
+        {/* ── Tags Tab ── */}
+        {activeTab === "tags" && (
+          <div className="space-y-6">
+            <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/50">
+                <h2 className="text-sm font-semibold text-foreground">Manage Tags</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Create and delete tags for organizing your models</p>
+              </div>
+              <div className="p-5 space-y-4">
+                {/* Create tag */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && newTagName.trim()) createTag.mutate({ name: newTagName.trim(), color: newTagColor }); }}
+                    placeholder="New tag name…"
+                    className="flex-1 px-3 py-2 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <div className="flex gap-1">
+                    {TAG_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setNewTagColor(c)}
+                        className={cn("w-6 h-6 rounded-full transition-transform", newTagColor === c && "ring-2 ring-offset-2 ring-offset-background ring-white scale-110")}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => { if (newTagName.trim()) createTag.mutate({ name: newTagName.trim(), color: newTagColor }); }}
+                    disabled={!newTagName.trim() || createTag.isPending}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                {/* Tag list — compact pill grid */}
+                {allTags.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No tags yet. Create one above.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {allTags.map((tag: any) => (
+                      <div
+                        key={tag.id}
+                        className="group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full border border-border/50 bg-secondary text-sm"
+                      >
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tag.color || "#6366f1" }} />
+                        <span className="text-foreground leading-none">{tag.name}</span>
+                        {(tag.modelCount ?? 0) > 0 && (
+                          <span className="text-[10px] text-muted-foreground leading-none">({tag.modelCount})</span>
+                        )}
+                        <button
+                          onClick={() => deleteTag.mutate({ id: tag.id })}
+                          className="ml-0.5 text-muted-foreground/40 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                          title="Delete tag"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+
+      </div>
+    </>
   );
 }

@@ -10,18 +10,18 @@ import { autoTagAllModels } from "./autoTagger";
 import { pickThumbnailsForAllModels, getThumbnailPickProgress, pickThumbnailForModel } from "./thumbnailPicker";
 import * as db from "./db";
 
-async function getLibraryPaths(): Promise<string[]> {
+async function getLibraryPaths(): Promise<{ path: string; scanDepth: number }[]> {
   // First check the new library_paths table
   const paths = await db.getEnabledLibraryPaths();
   if (paths.length > 0) return paths;
   // Fall back to legacy single library_path setting
   const stored = await db.getSetting("library_path");
-  return stored ? [stored] : [];
+  return stored ? [{ path: stored, scanDepth: 2 }] : [];
 }
 // Legacy single-path helper (used by rescanOne)
 async function getLibraryPath(): Promise<string> {
   const paths = await getLibraryPaths();
-  return paths[0] || "";
+  return paths[0]?.path || "";
 }
 
 let scanInProgress = false;
@@ -67,6 +67,12 @@ export const appRouter = router({
         for (const key of keys) {
           if (input[key] !== undefined) await db.setSetting(key, input[key] as string);
         }
+        // Sync LLM settings into ENV immediately so the LLM client picks them up
+        // without requiring a server restart.
+        const { ENV } = await import("./_core/env");
+        if (input.llm_api_url !== undefined) ENV.llmApiUrl = input.llm_api_url;
+        if (input.llm_api_key !== undefined) ENV.llmApiKey = input.llm_api_key;
+        if (input.llm_model !== undefined) ENV.llmModel = input.llm_model;
         return { success: true };
       }),
     validateLibraryPath: adminProcedure
@@ -90,17 +96,41 @@ export const appRouter = router({
         llm_model: all["llm_model"] || "",
       };
     }),
+    llmStatus: publicProcedure.query(async () => {
+      // Check whether the configured LLM is reachable and the model is available.
+      // Used by the frontend startup check to show a setup reminder if needed.
+      const { isLLMConfigured, listLLMModels } = await import("./_core/llm");
+      const { ENV } = await import("./_core/env");
+      if (!isLLMConfigured()) {
+        return { configured: false, modelAvailable: false, availableModels: [] as string[], modelName: ENV.llmModel || "" };
+      }
+      try {
+        const { data: models } = await listLLMModels();
+        const modelName = ENV.llmModel?.toLowerCase() ?? "";
+        const modelAvailable = models.some(
+          (m) => m.id.toLowerCase() === modelName || m.id.toLowerCase().startsWith(modelName)
+        );
+        return {
+          configured: true,
+          modelAvailable,
+          availableModels: models.map((m) => m.id),
+          modelName: ENV.llmModel || "",
+        };
+      } catch {
+        return { configured: true, modelAvailable: false, availableModels: [] as string[], modelName: ENV.llmModel || "" };
+      }
+    }),
     // Library paths management (multi-drive support)
     libraryPaths: adminProcedure.query(async () => {
       return db.getLibraryPaths();
     }),
     addLibraryPath: adminProcedure
-      .input(z.object({ path: z.string().min(1), label: z.string().min(1) }))
+      .input(z.object({ path: z.string().min(1), label: z.string().min(1), scanDepth: z.number().int().min(2).max(3).default(2) }))
       .mutation(async ({ input }) => {
         const { existsSync, statSync } = await import("fs");
         if (!existsSync(input.path)) throw new TRPCError({ code: "BAD_REQUEST", message: "Path does not exist" });
         if (!statSync(input.path).isDirectory()) throw new TRPCError({ code: "BAD_REQUEST", message: "Path is not a directory" });
-        await db.addLibraryPath({ path: input.path, label: input.label });
+        await db.addLibraryPath({ path: input.path, label: input.label, scanDepth: input.scanDepth });
         return { success: true };
       }),
     removeLibraryPath: adminProcedure
@@ -115,6 +145,12 @@ export const appRouter = router({
         await db.toggleLibraryPath(input.id, input.enabled);
         return { success: true };
       }),
+    updateLibraryPathDepth: adminProcedure
+      .input(z.object({ id: z.number(), scanDepth: z.number().int().min(2).max(3) }))
+      .mutation(async ({ input }) => {
+        await db.updateLibraryPathDepth(input.id, input.scanDepth);
+        return { success: true };
+      }),
     // Public settings (branding) — visible to all users
     branding: publicProcedure.query(async () => {
       const all = await db.getAllSettings();
@@ -124,6 +160,43 @@ export const appRouter = router({
         app_logo: all["app_logo"] || "",
       };
     }),
+    // Folder browser for library path selection
+    browseFolder: adminProcedure
+      .input(z.object({ path: z.string().optional() }))
+      .query(async ({ input }) => {
+        const { readdirSync, statSync, existsSync } = await import("fs");
+        const nodePath = await import("path");
+        // No path = show drive roots (Windows) or / (Unix)
+        if (!input.path) {
+          if (process.platform === "win32") {
+            const roots: { name: string; path: string }[] = [];
+            for (const letter of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+              const p = `${letter}:\\`;
+              try { statSync(p); roots.push({ name: `${letter}:  (Drive)`, path: p }); } catch {}
+            }
+            return { current: "", parent: null, entries: roots };
+          }
+          const entries = readdirSync("/", { withFileTypes: true })
+            .filter(e => e.isDirectory() && !e.name.startsWith("."))
+            .map(e => ({ name: e.name, path: `/${e.name}` }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          return { current: "/", parent: null, entries };
+        }
+        const current = input.path;
+        if (!existsSync(current)) throw new TRPCError({ code: "BAD_REQUEST", message: "Path does not exist" });
+        const parentPath = nodePath.dirname(current);
+        const parent = parentPath !== current ? parentPath : null;
+        let entries: { name: string; path: string }[] = [];
+        try {
+          entries = readdirSync(current, { withFileTypes: true })
+            .filter(e => e.isDirectory() && !e.name.startsWith("."))
+            .map(e => ({ name: e.name, path: nodePath.join(current, e.name) }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        } catch {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Cannot read this folder" });
+        }
+        return { current, parent, entries };
+      }),
   }),
 
   scan: router({
@@ -263,11 +336,14 @@ export const appRouter = router({
         const model = await db.getModelById(input.id);
         if (!model) return null;
         const modelTags = await db.getTagsForModel(input.id);
-        // Build the full local folder path for Open in Explorer / Open in Slicer
+        // Build the full local folder path for Open in Explorer / Open in Slicer.
+        // model.path stores the clean relative path (e.g. "Beasts and Minis/Dragon").
+        // model.driveId is the prefixed localId (e.g. "__root__::Beasts and Minis/Dragon")
+        // and must NOT be used here — joining rootPath + driveId produces a broken path.
         const nodePath = require("path");
         const rootPath = model.rootPath || "";
-        const localFolderPath = rootPath && model.driveId
-          ? nodePath.join(rootPath, model.driveId)
+        const localFolderPath = rootPath && model.path
+          ? nodePath.join(rootPath, model.path)
           : model.path || "";
         return { ...model, tags: modelTags, localFolderPath };
       }),
@@ -307,15 +383,16 @@ export const appRouter = router({
         const libraryPath = await getLibraryPath();
         if (!libraryPath) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Library path not configured" });
 
-        // model.driveId is the localId: "CollectionName/ModelName"
-        const modelFolderPath = require("path").join(libraryPath, model.driveId);
+                // model.path stores the clean relative path (e.g. "Beasts and Minis/Dragon").
+        // model.driveId is the prefixed localId and must NOT be used for filesystem operations.
+        const modelRelPath = model.path || "";
+        const modelFolderPath = require("path").join(libraryPath, modelRelPath);
         const { existsSync } = require("fs");
         if (!existsSync(modelFolderPath)) {
           throw new TRPCError({ code: "NOT_FOUND", message: `Model folder not found at: ${modelFolderPath}` });
         }
-
         // Re-detect parent collection by checking the folder's parent directory name
-        const parentFolderName = require("path").dirname(model.driveId); // e.g. "Beasts and Minis"
+        const parentFolderName = require("path").dirname(modelRelPath); // e.g. "Beasts and Minis"
         const allCategories = await db.getAllCategories();
         const matchedCategory = allCategories.find((c) => c.name === parentFolderName || c.driveId === parentFolderName);
         let newCategoryId: number | null = model.categoryId ?? null;
@@ -353,7 +430,7 @@ export const appRouter = router({
           : model.thumbnailUrl ?? "";
 
         await db.upsertModel({
-          driveId: model.driveId,
+          driveId: model.driveId ?? "",
           name: model.name,
           categoryId: newCategoryId,
           path: model.path ?? "",

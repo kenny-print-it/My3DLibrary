@@ -5,6 +5,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 
+// Read version from package.json at build time
+const pkg = JSON.parse(
+  fs.readFileSync(path.resolve(import.meta.dirname, "package.json"), "utf-8")
+);
+
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
 // Writes browser logs directly to files, trimmed when exceeding size limit
@@ -153,6 +158,10 @@ const plugins = [react(), tailwindcss()];  // jsxLocPlugin removed (Manus-specif
 
 export default defineConfig({
   plugins,
+  define: {
+    // Inject version from package.json at build time — use __APP_VERSION__ in frontend code
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

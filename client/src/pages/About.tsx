@@ -87,51 +87,6 @@ export default function About() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
 
-        {/* About Kenny */}
-        <Card>
-          <CardContent className="pt-6">
-            <h2 className="text-xl font-bold mb-4">About Kenny</h2>
-            <p className="text-muted-foreground leading-relaxed mb-4">
-              Hey, I'm Kenny, a dad from Virginia who turned a fascination with 3D printing into a
-              full-blown obsession. <strong>Kenny Print It?</strong> is my personal hobby space where I
-              tackle the ultimate maker question: "Can someone actually print that?" Whether I'm
-              dialing in crisp details on a cosplay prop for the kids, engineering a rugged functional
-              fix for around the house, or beta testing the latest multi-color hardware from Anycubic,
-              I love pushing my machines to their absolute limits. When I'm not designing a new part
-              from scratch or monitoring a print bed, I'm just a regular guy enjoying the challenge of
-              turning digital ideas into physical reality.
-            </p>
-            <p className="text-muted-foreground leading-relaxed">
-              The maker community is all about sharing, so I put all my designs and project updates
-              out there for everyone to use. You can hang out and watch my build journey on YouTube,
-              download my latest printable models on MakerWorld and MakerOnline, or catch my
-              day-to-day projects on Facebook and Reddit. If you've got a crazy project idea or just
-              want to talk shop about slicer settings, feel free to connect — let's build something
-              cool!
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* About My3DLibrary */}
-        <Card>
-          <CardContent className="pt-6">
-            <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
-              About My3DLibrary
-              <Badge variant="secondary">v1.0</Badge>
-            </h2>
-            <p className="text-muted-foreground leading-relaxed mb-4">
-              My3DLibrary is a self-hosted 3D model library created by Kenny Print It? to help
-              3D printing enthusiasts organize, browse, and manage their model collections.
-              Built with AI-powered tagging, a built-in STL viewer, and support for multiple
-              library locations across different drives.
-            </p>
-            <p className="text-muted-foreground leading-relaxed">
-              Your files stay on your computer — My3DLibrary never uploads your models anywhere.
-              Everything runs locally on your machine.
-            </p>
-          </CardContent>
-        </Card>
-
         {/* Social links */}
         <Card>
           <CardContent className="pt-6">
@@ -163,9 +118,86 @@ export default function About() {
           </CardContent>
         </Card>
 
+        {/* Ko-fi Support Card */}
+        <Card className="border-[#ff5e5b]/30 bg-gradient-to-br from-[#ff5e5b]/5 to-[#ff5e5b]/10">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row items-center gap-5">
+              {/* Ko-fi cup icon */}
+              <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-[#ff5e5b] flex items-center justify-center shadow-lg">
+                <svg viewBox="0 0 24 24" className="w-9 h-9 fill-white" aria-hidden="true">
+                  <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 2.692.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z" />
+                </svg>
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <h2 className="text-lg font-bold mb-1">Support Kenny on Ko-fi</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                  My3DLibrary is free and always will be. If it saves you time or brings some order
+                  to your collection, buying a coffee helps keep the project going!
+                </p>
+                <a
+                  href="https://ko-fi.com/kennyprintit"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#ff5e5b] text-white text-sm font-semibold hover:bg-[#e54d4a] transition-colors shadow-md"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white" aria-hidden="true">
+                    <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 2.692.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z" />
+                  </svg>
+                  Buy me a coffee
+                </a>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* About Kenny */}
+        <Card>
+          <CardContent className="pt-6">
+            <h2 className="text-xl font-bold mb-4">About Kenny</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+              Hey, I'm Kenny, a dad from Virginia who turned a fascination with 3D printing into a
+              full-blown obsession. <strong>Kenny Print It?</strong> is my personal hobby space where I
+              tackle the ultimate maker question: "Can someone actually print that?" Whether I'm
+              dialing in crisp details on a cosplay prop for the kids, engineering a rugged functional
+              fix for around the house, or beta testing the latest multi-color hardware from Anycubic,
+              I love pushing my machines to their absolute limits. When I'm not designing a new part
+              from scratch or monitoring a print bed, I'm just a regular guy enjoying the challenge of
+              turning digital ideas into physical reality.
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              The maker community is all about sharing, so I put all my designs and project updates
+              out there for everyone to use. You can hang out and watch my build journey on YouTube,
+              download my latest printable models on MakerWorld and MakerOnline, or catch my
+              day-to-day projects on Facebook and Reddit. If you've got a crazy project idea or just
+              want to talk shop about slicer settings, feel free to connect — let's build something
+              cool!
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* About My3DLibrary */}
+        <Card>
+          <CardContent className="pt-6">
+            <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
+              About My3DLibrary
+              <Badge variant="secondary">v1.0 Beta</Badge>
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+              My3DLibrary is a self-hosted 3D model library created by Kenny Print It? to help
+              3D printing enthusiasts organize, browse, and manage their model collections.
+              Built with AI-powered tagging, a built-in STL viewer, and support for multiple
+              library locations across different drives.
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Your files stay on your computer — My3DLibrary never uploads your models anywhere.
+              Everything runs locally on your machine.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground pb-4">
-          <p>My3DLibrary v1.0 — Created by Kenny Print It?</p>
+          <p>My3DLibrary v1.0 Beta — Created by Kenny Print It?</p>
           <p className="mt-1">3D Printing &amp; Designs — Hobby, Cosplay, Toys, Gadgets &amp; Mods</p>
         </div>
       </div>

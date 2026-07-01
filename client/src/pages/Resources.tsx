@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -112,8 +112,9 @@ function ResourceFormDialog({
   isSaving: boolean;
 }) {
   const [form, setForm] = useState<ResourceFormData>(initial);
-  // Reset when dialog opens with new initial data
-  useState(() => { setForm(initial); });
+  // Sync form state whenever the dialog opens with new initial data (edit vs add)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setForm(initial); }, [open]);
 
   function set(field: keyof ResourceFormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -307,8 +308,9 @@ export default function Resources() {
         )}
       </div>
 
-      {/* Add / Edit dialog */}
+      {/* Add / Edit dialog — key forces remount so form state is always fresh */}
       <ResourceFormDialog
+        key={editingResource ? `edit-${editingResource.id}` : "add"}
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         initial={formInitial}

@@ -3,7 +3,7 @@
  * Replaces the Manus OAuth SDK for the self-hosted local version.
  */
 import { SignJWT, jwtVerify } from "jose";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import type { Request, Response, Express } from "express";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { ENV } from "./env";
@@ -147,5 +147,25 @@ export function registerAuthRoutes(app: Express) {
   app.get("/api/auth/setup-required", async (_req: Request, res: Response) => {
     const adminExists = await db.adminExists();
     res.json({ setupRequired: !adminExists });
+  });
+
+  // POST /api/auth/guest-login — no-credential login for portable/local mode
+  // Auto-creates the owner admin account on first call, then issues a session.
+  app.post("/api/auth/guest-login", async (req: Request, res: Response) => {
+    let user = await db.getUserByUsername("owner");
+    if (!user) {
+      // First launch: seed the owner account silently
+      const passwordHash = await hashPassword("local-owner-no-password");
+      await db.createLocalUser({ username: "owner", passwordHash, role: "admin" });
+      user = await db.getUserByUsername("owner");
+    }
+    if (!user) {
+      res.status(500).json({ error: "Failed to initialise owner account" });
+      return;
+    }
+    const token = await createSessionToken(user.id, user.username!);
+    const opts = getSessionCookieOptions(req);
+    res.cookie(COOKIE_NAME, token, { ...opts, maxAge: ONE_YEAR_MS });
+    res.json({ ok: true, user: { id: user.id, username: user.username, role: user.role } });
   });
 }

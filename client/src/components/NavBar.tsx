@@ -1,10 +1,9 @@
 import { Link, useLocation } from "wouter";
-import { Settings, RefreshCw, Clock, LogIn, LogOut, User, Library } from "lucide-react";
+import { Settings, RefreshCw, Clock } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/_core/hooks/useAuth";
 
 function timeAgo(date: Date | string | null | undefined): string {
   if (!date) return "";
@@ -22,8 +21,6 @@ export default function NavBar() {
   const [location] = useLocation();
   const [scanning, setScanning] = useState(false);
   const utils = trpc.useUtils();
-  const { user, isAuthenticated, logout } = useAuth();
-  const isAdmin = user?.role === "admin";
 
   const { data: scanStatus } = trpc.scan.status.useQuery(undefined, {
     refetchInterval: scanning ? 2000 : 30000,
@@ -33,7 +30,7 @@ export default function NavBar() {
     onMutate: () => setScanning(true),
     onSuccess: (data) => {
       if (data.success) {
-        toast.success("Scanning your Google Drive…", {
+        toast.success("Scanning your library…", {
           description: "New models will appear as the scan progresses.",
         });
         const poll = setInterval(async () => {
@@ -69,9 +66,9 @@ export default function NavBar() {
       <div className="container flex h-14 items-center gap-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <Library className="w-6 h-6 text-primary" />
+          <img src="/m3dl-icon.png" alt="My3DLibrary" className="h-8 w-8 object-contain" />
           <span className="font-semibold text-sm tracking-wide text-foreground">
-            PrintLib
+            My3DLibrary
           </span>
         </Link>
 
@@ -114,8 +111,8 @@ export default function NavBar() {
 
         <div className="flex-1" />
 
-        {/* Last synced indicator — visible to all authenticated users */}
-        {isAuthenticated && scanStatus?.lastScan?.completedAt && !scanning && (
+        {/* Last synced indicator */}
+        {scanStatus?.lastScan?.completedAt && !scanning && (
           <div
             className="hidden md:flex items-center gap-1 text-xs text-muted-foreground/60"
             title={`Last synced: ${new Date(scanStatus.lastScan.completedAt).toLocaleString()}`}
@@ -127,69 +124,34 @@ export default function NavBar() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Scan button — admin only */}
-          {isAdmin && (
-            <button
-              onClick={() => startScan.mutate()}
-              disabled={scanning}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-                scanning && "opacity-60 cursor-not-allowed"
-              )}
-              title="Re-scan library folder"
-            >
-              <RefreshCw className={cn("w-4 h-4", scanning && "animate-spin")} />
-              <span className="hidden sm:inline">{scanning ? "Scanning…" : "Scan"}</span>
-            </button>
-          )}
+          {/* Scan button */}
+          <button
+            onClick={() => startScan.mutate()}
+            disabled={scanning}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+              "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+              scanning && "opacity-60 cursor-not-allowed"
+            )}
+            title="Re-scan library folder"
+          >
+            <RefreshCw className={cn("w-4 h-4", scanning && "animate-spin")} />
+            <span className="hidden sm:inline">{scanning ? "Scanning…" : "Scan"}</span>
+          </button>
 
-          {/* Settings link — admin only */}
-          {isAdmin && (
-            <Link
-              href="/settings"
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                location === "/settings"
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              )}
-            >
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Settings</span>
-            </Link>
-          )}
-
-          {/* User section */}
-          {isAuthenticated ? (
-            <div className="flex items-center gap-2 pl-2 border-l border-border/50">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <User className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline max-w-[100px] truncate">{user?.name ?? "Viewer"}</span>
-                {isAdmin && (
-                  <span className="hidden sm:inline text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-medium">
-                    Owner
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => logout()}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
-                title="Sign out"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Sign out</span>
-              </button>
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>Sign in</span>
-            </Link>
-          )}
+          {/* Settings link */}
+          <Link
+            href="/settings"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+              location === "/settings"
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+            )}
+          >
+            <Settings className="w-4 h-4" />
+            <span className="hidden sm:inline">Settings</span>
+          </Link>
         </div>
       </div>
     </header>

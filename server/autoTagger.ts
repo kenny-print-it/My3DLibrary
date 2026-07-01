@@ -10,8 +10,22 @@
  *   - Called manually via the "Re-tag All" admin procedure
  */
 
-import { invokeLLM } from "./_core/llm";
+import { invokeLLM, listLLMModels, isLLMConfigured } from "./_core/llm";
 import * as db from "./db";
+import { ENV } from "./_core/env";
+
+async function isModelAvailable(): Promise<boolean> {
+  if (!isLLMConfigured()) return false;
+  try {
+    const { data: models } = await listLLMModels();
+    const modelName = ENV.llmModel?.toLowerCase() ?? "";
+    return models.some(
+      (m) => m.id.toLowerCase() === modelName || m.id.toLowerCase().startsWith(modelName)
+    );
+  } catch {
+    return false;
+  }
+}
 
 /** Tag a single model by its DB id. Returns the tag ids applied. */
 export async function autoTagModel(
@@ -28,55 +42,55 @@ export async function autoTagModel(
       ? `\nFiles in this model folder: ${fileNames.slice(0, 20).join(", ")}${fileNames.length > 20 ? ` … (${fileNames.length} total)` : ""}`
       : "";
 
-  const prompt = `You are a tag classifier for a 3D printing model library.
+  const prompt = `You are a strict tag classifier for a 3D printing model library.
 
 Available tags: ${tagList}
 
 Model name: "${modelName}"${filesSnippet}
 
-Return a JSON array of tag names from the available list that best describe this model.
+Return a JSON array of tag names from the available list that clearly and specifically describe this model.
 Rules:
 - Only use tags from the available list — never invent new ones.
-- Return an empty array [] if none fit.
-- Be generous: if the model name contains a franchise name, character, or item type that matches a tag, include it.
-- Return at most 6 tags.
+- Return an empty array [] if you are not confident a tag applies.
+- Be CONSERVATIVE: only apply a tag if the model name or files contain a clear, direct reference to that tag. Do NOT guess or infer loosely.
+- A tag for a franchise (e.g. "Pokemon") should ONLY be applied if the model name or files explicitly mention that franchise by name.
+- Do NOT apply a tag just because the model is a creature, character, or could vaguely belong to a category.
+- Return at most 4 tags.
 - Return ONLY the JSON array, no explanation.`;
 
   try {
     const response = await invokeLLM({
       messages: [{ role: "user", content: prompt }],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "tag_list",
-          strict: true,
-          schema: {
-            type: "object",
-            properties: {
-              tags: {
-                type: "array",
-                items: { type: "string" },
-              },
-            },
-            required: ["tags"],
-            additionalProperties: false,
-          },
-        },
-      },
+      // Note: response_format json_schema is NOT supported by Ollama/LLaVA.
+      // We ask the model to respond with JSON in the prompt and extract it below.
     });
 
     const raw = response?.choices?.[0]?.message?.content as string | undefined;
     if (!raw) return [];
 
-    let parsed: { tags: string[] };
+    // Extract JSON from the response — the model may wrap it in markdown code fences
+    // or return a plain array instead of {tags:[...]}
+    let tagNames: string[] = [];
     try {
-      parsed = JSON.parse(raw);
+      const direct = JSON.parse(raw.trim());
+      if (Array.isArray(direct)) {
+        tagNames = direct;
+      } else if (Array.isArray(direct?.tags)) {
+        tagNames = direct.tags;
+      }
     } catch {
-      return [];
+      // Try extracting a JSON array from the text
+      const arrMatch = raw.match(/\[[^\]]*\]/);
+      if (arrMatch) {
+        try { tagNames = JSON.parse(arrMatch[0]); } catch { /* ignore */ }
+      }
     }
 
+    // Guard: LLM may return non-string values (numbers, nulls, objects) — filter them out
     const selectedNames = new Set(
-      (parsed.tags ?? []).map((n: string) => n.toLowerCase().trim())
+      tagNames
+        .filter((n): n is string => typeof n === "string")
+        .map((n) => n.toLowerCase().trim())
     );
 
     const matchedIds = availableTags
@@ -109,6 +123,13 @@ export async function autoTagAllModels(forceAll = false): Promise<{
   skipped: number;
   errors: number;
 }> {
+  // Pre-flight: verify the model is available before processing all models
+  const modelReady = await isModelAvailable();
+  if (!modelReady) {
+    console.warn("[AutoTagger] LLM model not available — skipping auto-tag. Run Download-AI-Model.bat first.");
+    return { processed: 0, tagged: 0, skipped: 0, errors: 0 };
+  }
+
   const allTags = await db.getAllTags();
   if (allTags.length === 0) {
     console.log("[AutoTagger] No tags in library — skipping.");
