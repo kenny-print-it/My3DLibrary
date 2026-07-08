@@ -284,6 +284,7 @@ export async function getAllModels(filters?: {
   tagIds?: number[];
   fileType?: string;
   sortBy?: "name_asc" | "name_desc" | "newest" | "most_files" | "most_renders";
+  favoritesOnly?: boolean;
 }) {
   const db = await getDb();
   if (!db) return [];
@@ -348,6 +349,7 @@ export async function getAllModels(filters?: {
   }
 
   if (filters?.fileType) allRows = allRows.filter((m) => (m.modelFiles as any[])?.some((f: any) => f.name?.toLowerCase().endsWith(`.${filters!.fileType!.toLowerCase()}`)));
+  if (filters?.favoritesOnly) allRows = allRows.filter((m) => m.isFavorite);
   return applySort(allRows);
 }
 

@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
   Search, Filter, X, Heart, Box, FolderOpen, RefreshCw,
   ArrowUpDown, CheckCheck, ChevronDown, ChevronRight,
-  GripVertical, LayoutList,
+  GripVertical, LayoutList, Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
 // Local version: images served directly from local filesystem
 function getModelImageUrl(images: any[] | null | undefined, heroImage: string | null | undefined, _size: number): string | null {
   if (!images || images.length === 0) return null;
@@ -196,6 +198,81 @@ function useCategoryCollapse() {
   return { collapsed, toggle, collapseAll, expandAll };
 }
 
+// Responsive column count hook
+function useColumnCount() {
+  const [cols, setCols] = useState(2);
+  useEffect(() => {
+    function update() {
+      const w = window.innerWidth;
+      if (w >= 1280) setCols(6);
+      else if (w >= 1024) setCols(5);
+      else if (w >= 768) setCols(4);
+      else if (w >= 640) setCols(3);
+      else setCols(2);
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return cols;
+}
+
+// Virtual scrolling grid for large model lists
+function VirtualModelGrid({
+  models,
+  isReordering,
+  onNavigate,
+}: {
+  models: any[];
+  isReordering: boolean;
+  onNavigate: (path: string) => void;
+}) {
+  const cols = useColumnCount();
+  const CARD_HEIGHT = 220; // approximate card height in px
+  const GAP = 16;
+  const rows = Math.ceil(models.length / cols);
+  const parentRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: rows,
+    getScrollElement: () => document.documentElement,
+    estimateSize: () => CARD_HEIGHT + GAP,
+    overscan: 3,
+  });
+  const totalHeight = rowVirtualizer.getTotalSize();
+  return (
+    <div ref={parentRef} style={{ position: "relative", height: `${totalHeight}px` }}>
+      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+        const startIdx = virtualRow.index * cols;
+        const rowModels = models.slice(startIdx, startIdx + cols);
+        return (
+          <div
+            key={virtualRow.key}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              transform: `translateY(${virtualRow.start}px)`,
+              display: "grid",
+              gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+              gap: `${GAP}px`,
+              paddingBottom: `${GAP}px`,
+            }}
+          >
+            {rowModels.map((model) => (
+              <ModelCard
+                key={model.id}
+                model={model}
+                onClick={() => !isReordering && onNavigate(`/model/${model.id}`)}
+              />
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function SortableCategoryRow({
   group,
   isReordering,
@@ -256,11 +333,7 @@ function SortableCategoryRow({
           )}
         </div>
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-none">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {group.models.map((model) => (
-              <ModelCard key={model.id} model={model} onClick={() => !isReordering && onNavigate(`/model/${model.id}`)} />
-            ))}
-          </div>
+          <VirtualModelGrid models={group.models} isReordering={isReordering} onNavigate={onNavigate} />
         </CollapsibleContent>
       </Collapsible>
     </div>
@@ -388,6 +461,7 @@ export default function Home() {
   const [selectedFileType, setSelectedFileType] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("name_asc");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -402,6 +476,7 @@ export default function Home() {
       tagIds: selectedTags.length > 0 ? selectedTags : undefined,
       fileType: selectedFileType ?? undefined,
       sortBy,
+      favoritesOnly: favoritesOnly || undefined,
     },
     { keepPreviousData: true } as any
   );
@@ -411,7 +486,7 @@ export default function Home() {
     [categories]
   );
 
-  const isFiltered = !!(search || selectedCategory || selectedTags.length > 0 || selectedFileType);
+  const isFiltered = !!(search || selectedCategory || selectedTags.length > 0 || selectedFileType || favoritesOnly);
   const activeFilterCount = (selectedCategory ? 1 : 0) + selectedTags.length + (selectedFileType ? 1 : 0);
 
   const grouped = useMemo(() => {
@@ -429,13 +504,16 @@ export default function Home() {
     return result;
   }, [models, topCategories, isFiltered]);
 
+  // isConfigured: false means no library paths set up yet (first-run state)
+  const isConfigured = scanStatus?.isConfigured !== false; // default true until data loads
+
   // isFirstScan: true only when the DB has zero models (regardless of scan log history)
   const isFirstScan = !modelsLoading && models.length === 0;
   const isScanning = scanStatus?.inProgress;
   const progress = scanStatus?.progress;
 
   // Auto-scan on first load: trigger automatically when the library is genuinely empty.
-  // This fires even if a previous scan log exists (e.g. a failed or stale run).
+  // Only fires when the library is configured (has paths set up).
   const autoScanFired = useRef(false);
   const utils = trpc.useUtils();
   const startScanMutation = trpc.scan.start.useMutation({
@@ -467,11 +545,11 @@ export default function Home() {
     if (autoScanFired.current) return;
     if (isScanning) return; // a scan is already running — don't double-trigger
     if (modelsLoading || scanStatus === undefined) return; // still loading initial data
-    if (isFirstScan) {
+    if (isFirstScan && isConfigured) {
       autoScanFired.current = true;
       startScanMutation.mutate();
     }
-  }, [isFirstScan, isScanning, modelsLoading, scanStatus]);
+  }, [isFirstScan, isScanning, modelsLoading, scanStatus, isConfigured]);
 
   return (
     <div className="container py-8">
@@ -543,6 +621,20 @@ export default function Home() {
               })}
             </div>
           )}
+
+          {/* Favorites toggle */}
+          <button
+            onClick={() => setFavoritesOnly(!favoritesOnly)}
+            title={favoritesOnly ? "Showing favorites only — click to show all" : "Show favorites only"}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
+              favoritesOnly
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-secondary text-muted-foreground border-border/50 hover:text-foreground"
+            )}
+          >
+            <Heart className={cn("w-4 h-4", favoritesOnly ? "fill-primary-foreground" : "")} />
+          </button>
 
           {/* Filters toggle */}
           <button
@@ -718,8 +810,30 @@ export default function Home() {
         </div>
       )}
 
-      {/* Empty state — first scan (auto-scan is firing, show spinner) */}
-      {isFirstScan && !isScanning && (
+      {/* First-run onboarding — not configured yet (no library paths) */}
+      {isFirstScan && !isScanning && !isConfigured && (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
+            <FolderOpen className="w-8 h-8 text-amber-500" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Welcome to My 3D Library!</h2>
+          <p className="text-muted-foreground text-sm max-w-sm mb-6">
+            To get started, add your 3D model library folders in Settings → Library Paths. The app will scan them and index all your models.
+          </p>
+          {isAdmin && (
+            <button
+              onClick={() => navigate("/settings")}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              <Settings className="w-4 h-4" />
+              Open Settings
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Empty state — configured, auto-scan is firing */}
+      {isFirstScan && !isScanning && isConfigured && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
             <RefreshCw className="w-8 h-8 text-primary animate-spin" />
@@ -738,25 +852,32 @@ export default function Home() {
         </div>
       )}
 
-      {/* Filtered results */}
+      {/* Filtered results (search, category, tags, file type, or favorites) */}
       {!modelsLoading && isFiltered && (
         <div>
           <p className="text-sm text-muted-foreground mb-4">
-            {models.length} result{models.length !== 1 ? "s" : ""}
+            {favoritesOnly && !search && !selectedFileType
+              ? `${models.length} favorite${models.length !== 1 ? "s" : ""}`
+              : `${models.length} result${models.length !== 1 ? "s" : ""}`}
             {search && <span> for "<span className="text-foreground">{search}</span>"</span>}
             {selectedFileType && <span className="ml-1 font-mono uppercase text-primary">.{selectedFileType}</span>}
           </p>
           {models.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Search className="w-10 h-10 text-muted-foreground/30 mb-3" />
-              <p className="text-muted-foreground">No models match your filters.</p>
+              {favoritesOnly ? (
+                <>
+                  <Heart className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground">No favorites yet. Open a model and tap the heart icon to save it here.</p>
+                </>
+              ) : (
+                <>
+                  <Search className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground">No models match your filters.</p>
+                </>
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {models.map((model) => (
-                <ModelCard key={model.id} model={model} onClick={() => navigate(`/model/${model.id}`)} />
-              ))}
-            </div>
+            <VirtualModelGrid models={models} isReordering={false} onNavigate={navigate} />
           )}
         </div>
       )}

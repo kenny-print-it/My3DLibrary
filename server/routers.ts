@@ -296,10 +296,12 @@ export const appRouter = router({
     }),
     status: protectedProcedure.query(async () => {
       const log = await db.getLastScanLog();
+      const paths = await db.getEnabledLibraryPaths();
       return {
         inProgress: scanInProgress,
         lastScan: log,
         progress: scanInProgress ? scanProgress : null,
+        isConfigured: paths.length > 0,
       };
     }),
   }),
@@ -328,6 +330,7 @@ export const appRouter = router({
         tagIds: z.array(z.number()).optional(),
         fileType: z.string().optional(),
         sortBy: z.enum(["name_asc", "name_desc", "newest", "most_files", "most_renders"]).optional(),
+        favoritesOnly: z.boolean().optional(),
       }).optional())
       .query(async ({ input }) => db.getAllModels(input)),
     get: protectedProcedure

@@ -1,14 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Heart, ExternalLink, Download, Box, ChevronLeft, ChevronRight,
-  Tag, Plus, X, Pencil, Check, FolderOpen, FileBox, Archive, FileText, File, Star, Copy
+  Tag, Plus, X, Pencil, Check, FolderOpen, FileBox, Archive, FileText, File, Star
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import STLViewer from "@/components/STLViewer";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// Portable: images are served via /local-files/ URLs stored in thumbnailLink
+function localImageUrl(img: any): string | null {
+  if (!img) return null;
+  return img.thumbnailLink || null;
+}
 
 const TAG_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316",
@@ -43,7 +49,7 @@ export default function ModelDetail() {
   const [editingCatLabel, setEditingCatLabel] = useState(false);
   const [catLabelValue, setCatLabelValue] = useState("");
   const { user } = useAuth();
-  const isOwner = user?.role === "admin";
+  const isOwner = !!(user?.role === "admin" || user?.openId === (window as any).__OWNER_OPEN_ID);
 
   const utils = trpc.useUtils();
 
@@ -131,6 +137,44 @@ export default function ModelDetail() {
     },
   });
 
+  // Carousel wheel scroll — must be declared before any early returns (Rules of Hooks)
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const imagesLengthRef = useRef(0);
+  useEffect(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const len = imagesLengthRef.current;
+      if (len <= 1) return;
+      e.preventDefault();
+      if (e.deltaY > 0) setActiveImg((i) => (i + 1) % len);
+      else setActiveImg((i) => (i - 1 + len) % len);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [isLoading]); // re-run after loading clears so the carousel element is in the DOM
+
+  // Keyboard arrow navigation — works on model page and inside lightbox
+  const lightboxRef = useRef(false);
+  useEffect(() => { lightboxRef.current = lightbox; }, [lightbox]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const len = imagesLengthRef.current;
+      if (len <= 1) return;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveImg((i) => (i + 1) % len);
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveImg((i) => (i - 1 + len) % len);
+      } else if (e.key === "Escape" && lightboxRef.current) {
+        setLightbox(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isLoading]); // re-run after loading so imagesLengthRef is populated
+
   if (isLoading) {
     return (
       <div className="container py-8">
@@ -159,14 +203,11 @@ export default function ModelDetail() {
 
   const images: any[] = model.images as any[] || [];
   const heroImageUrl: string | null = (model as any).heroImage || null;
-  // Find the active image index matching the current heroImage
-  // For local files: heroImage is the thumbnailLink (/local-files/...) or webContentLink
-  // For Drive files: heroImage is /api/drive-image/{id}
+  // Find the active image index matching the current heroImage (match by fileId)
   const heroIdx = heroImageUrl
     ? images.findIndex((img) =>
         img.thumbnailLink === heroImageUrl ||
-        img.webContentLink === heroImageUrl ||
-        (img.id && (heroImageUrl.includes(img.id) || heroImageUrl === `/api/drive-image/${img.id}`))
+        img.webContentLink === heroImageUrl
       )
     : -1;
   // First STL for viewer fallback
@@ -190,6 +231,9 @@ export default function ModelDetail() {
   const modelTags: any[] = (model as any).tags || [];
   const category = categories.find((c) => c.id === model.categoryId);
 
+  // Keep the ref in sync so the stable wheel handler always has the current count
+  imagesLengthRef.current = images.length;
+
   const prevImg = () => setActiveImg((i) => (i - 1 + images.length) % images.length);
   const nextImg = () => setActiveImg((i) => (i + 1) % images.length);
 
@@ -212,7 +256,7 @@ export default function ModelDetail() {
             onClick={() => rescanOne.mutate({ id: modelId })}
             disabled={rescanOne.isPending}
             className="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg border border-border bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Re-scan this model's folder on disk and re-pick the best thumbnail"
+            title="Re-fetch this model's files and images from Google Drive, then re-pick the best thumbnail"
           >
             {rescanOne.isPending ? (
               <>
@@ -237,12 +281,13 @@ export default function ModelDetail() {
         <div className="lg:col-span-3 space-y-3">
           {/* Main image */}
           <div
+            ref={carouselRef}
             className="relative aspect-[4/3] rounded-xl overflow-hidden bg-muted cursor-pointer group"
             onClick={() => images.length > 0 && setLightbox(true)}
           >
             {images.length > 0 ? (
               <img
-                src={images[activeImg]?.localUrl || images[activeImg]?.thumbnailUrl || images[activeImg]?.thumbnailLink || ""}
+                src={localImageUrl(images[activeImg]) || ""}
                 alt={images[activeImg]?.name}
                 className="w-full h-full object-contain bg-muted"
               />
@@ -308,7 +353,7 @@ export default function ModelDetail() {
                 {images.map((img, i) => {
                   const isHero = i === heroIdx;
                   return (
-                    <div key={img.fileId || img.id || i} className="relative shrink-0 group/thumb">
+                    <div key={img.fileId || img.thumbnailLink} className="relative shrink-0 group/thumb">
                       <button
                         onClick={() => setActiveImg(i)}
                         className={cn(
@@ -317,9 +362,10 @@ export default function ModelDetail() {
                         )}
                       >
                         <img
-                          src={img.localUrl || img.thumbnailUrl || img.thumbnailLink || ""}
+                          src={localImageUrl(img) || ""}
                           alt={img.name}
                           className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).src = img.thumbnailLink?.replace("=s220", "=s120") || ""; }}
                         />
                       </button>
                       {/* Hero badge */}
@@ -333,10 +379,9 @@ export default function ModelDetail() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            // FIX: For local files use thumbnailLink (the /local-files/... URL) directly.
-                            // For Drive files use the proxy URL. img.id is undefined for local files.
-                            const heroUrl = img.thumbnailLink || img.webContentLink || (img.id ? `/api/drive-image/${img.id}` : "");
-                            if (heroUrl) setHeroImage.mutate({ id: modelId, heroImage: heroUrl });
+                            // Store the proxy URL as heroImage so it never expires
+                            const heroUrl = img.thumbnailLink;
+                            setHeroImage.mutate({ id: modelId, heroImage: heroUrl });
                           }}
                           className="absolute inset-0 rounded-lg bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex flex-col items-center justify-center gap-0.5 text-white text-[9px] font-medium"
                           title="Set as hero image"
@@ -358,56 +403,17 @@ export default function ModelDetail() {
               <FileBox className="w-4 h-4 text-muted-foreground" />
               <h3 className="text-sm font-medium text-foreground">Files</h3>
               <span className="text-xs text-muted-foreground">{modelFiles.length} file{modelFiles.length !== 1 ? "s" : ""}</span>
-              <div className="ml-auto flex items-center gap-2">
-                {model.localFolderPath && (
-                  <>
-                    <button
-                      onClick={() => {
-                        console.log('[Open Folder] path:', model.localFolderPath);
-                        fetch('/api/open-folder', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ path: model.localFolderPath }),
-                        })
-                          .then(async (r) => {
-                            const data = await r.json().catch(() => ({}));
-                            if (!r.ok) toast.error(`Could not open folder: ${data.error || r.statusText}`);
-                            else toast.info('Folder opened — check your taskbar if it opened behind this window');
-                          })
-                          .catch((err) => toast.error(`Network error: ${err.message}`));
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted hover:bg-accent text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
-                      title="Open model folder in Windows Explorer"
-                    >
-                      <FolderOpen className="w-3.5 h-3.5" />
-                      Open Folder
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(model.localFolderPath || '').then(() => {
-                          toast.success('Path copied to clipboard');
-                        }).catch(() => toast.error('Could not copy path'));
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted hover:bg-accent text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
-                      title="Copy folder path to clipboard"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      Copy Path
-                    </button>
-                  </>
-                )}
-                {modelFiles.length > 0 && (
-                  <a
-                    href={`/api/download/zip/${modelId}`}
-                    download
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-                    title="Download all files as ZIP"
-                  >
-                    <Archive className="w-3.5 h-3.5" />
-                    Download All (.zip)
-                  </a>
-                )}
-              </div>
+              {modelFiles.length > 0 && (
+                <a
+                  href={`/api/download/zip/${modelId}`}
+                  download
+                  className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                  title="Download all files as ZIP"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  Download All (.zip)
+                </a>
+              )}
             </div>
             {modelFiles.length === 0 ? (
               <div className="px-4 py-6 text-center text-sm text-muted-foreground">No model files found in this folder or its subfolders</div>
@@ -419,36 +425,18 @@ export default function ModelDetail() {
                   const extColors: Record<string, string> = { STL: "#6366f1", OBJ: "#8b5cf6", "3MF": "#14b8a6", STEP: "#f97316", STP: "#f97316", GCODE: "#22c55e", PDF: "#ef4444", TXT: "#94a3b8", MD: "#94a3b8", DOC: "#3b82f6", DOCX: "#3b82f6", ZIP: "#eab308", PNG: "#22c55e", JPG: "#22c55e", JPEG: "#22c55e" };
                   const extColor = extColors[fileExt] || "#6b7280";
                   return (
-                    <div key={file.id || file.fileId} className="flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors group">
+                    <div key={file.id} className="flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors group">
                       <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: extColor + "22", color: extColor }}>{fileExt}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground truncate">{file.name}</p>
                         <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {/* Open file with default app via server-side /api/open-file */}
-                        {(file.absPath || file.localUrl) && (
-                          <a
-                            href="#"
-                            className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                            title="Open in slicer"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              const p = file.absPath || file.localUrl || "";
-                              fetch('/api/open-file', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ path: p }),
-                              });
-                            }}
-                          >
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                            </svg>
-                          </a>
-                        )}
-                        {file.localUrl && (
-                          <a href={file.localUrl} download={file.name} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Download">
+                        <a href={file.webViewLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="View in Drive">
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                        {file.webContentLink && (
+                          <a href={file.webContentLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Download">
                             <Download className="w-3.5 h-3.5" />
                           </a>
                         )}
@@ -606,17 +594,30 @@ export default function ModelDetail() {
             )}
           </div>
 
-          {/* Model path info */}
-          <div className="flex items-center gap-2 w-full py-2.5 px-3 rounded-lg border border-border/50 text-sm text-muted-foreground">
-            <FolderOpen className="w-4 h-4 shrink-0" />
-            <span className="truncate text-xs font-mono flex-1">{model.localFolderPath || model.path || model.driveId}</span>
-          </div>
+          {/* View in Drive */}
+          <a
+            href={`https://drive.google.com/drive/folders/${model.driveId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Open folder in Google Drive
+          </a>
         </div>
       </div>
 
       {/* Lightbox */}
       {lightbox && images.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center" onClick={() => setLightbox(false)}>
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={() => setLightbox(false)}
+          onWheel={(e) => {
+            if (images.length <= 1) return;
+            e.preventDefault();
+            if (e.deltaY > 0) nextImg(); else prevImg();
+          }}
+        >
           <button onClick={() => setLightbox(false)} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -631,13 +632,16 @@ export default function ModelDetail() {
             </>
           )}
           <img
-            src={images[activeImg]?.localUrl || images[activeImg]?.thumbnailUrl || images[activeImg]?.thumbnailLink || ""}
-            alt={images[activeImg]?.name}
+            src={localImageUrl(images[activeImg]) || ""}
+            alt={images[activeImg].name}
             className="max-w-[90vw] max-h-[90vh] object-contain"
             onClick={(e) => e.stopPropagation()}
           />
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm">
-            {activeImg + 1} / {images.length} — {images[activeImg].name}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
+            <div className="bg-black/60 backdrop-blur-sm rounded-full px-4 py-1.5 text-white font-semibold text-sm tracking-wide">
+              {activeImg + 1} <span className="text-white/50">/</span> {images.length}
+            </div>
+            <div className="text-white/50 text-xs max-w-xs truncate text-center">{images[activeImg].name}</div>
           </div>
         </div>
       )}

@@ -10,12 +10,13 @@
 import type { Request, Response } from "express";
 import { getSetting } from "./db";
 
-// Simple in-memory cache: fileId → { url, fetchedAt }
+// Simple in-memory cache: `${fileId}:${size}` → { url, fetchedAt }
 const urlCache = new Map<string, { url: string; fetchedAt: number }>();
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 async function getFreshThumbnailUrl(fileId: string, apiKey: string, size: number): Promise<string> {
-  const cached = urlCache.get(fileId);
+  const cacheKey = `${fileId}:${size}`;
+  const cached = urlCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
     return cached.url;
   }
@@ -33,7 +34,7 @@ async function getFreshThumbnailUrl(fileId: string, apiKey: string, size: number
 
   // Replace the size suffix (=s220) with the requested size
   const url = meta.thumbnailLink.replace(/=s\d+$/, `=s${size}`);
-  urlCache.set(fileId, { url, fetchedAt: Date.now() });
+  urlCache.set(cacheKey, { url, fetchedAt: Date.now() });
   return url;
 }
 
@@ -53,13 +54,14 @@ export async function driveImageProxyHandler(req: Request, res: Response) {
       return;
     }
 
+    const cacheKey = `${fileId}:${size}`;
     const thumbnailUrl = await getFreshThumbnailUrl(fileId, apiKey, size);
 
     // Proxy the image bytes to avoid CORS issues
     const imgRes = await fetch(thumbnailUrl);
     if (!imgRes.ok) {
       // Cache miss — evict and retry once with a fresh URL
-      urlCache.delete(fileId);
+      urlCache.delete(cacheKey);
       const freshUrl = await getFreshThumbnailUrl(fileId, apiKey, size);
       const retryRes = await fetch(freshUrl);
       if (!retryRes.ok) {
