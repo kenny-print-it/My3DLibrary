@@ -7,26 +7,26 @@ echo   My3DLibrary Portable - Starting...
 echo ============================================
 echo.
 
-REM ── Locate this script's directory so it works from any drive ──────────────
+REM -- Locate this script's directory so it works from any drive --------------
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 
-REM ── Set data directory (database + settings live here) ─────────────────────
+REM -- Set data directory (database + settings live here) ---------------------
 set "DATA_DIR=%ROOT%\data"
 if not exist "%DATA_DIR%" mkdir "%DATA_DIR%"
 
-REM ── Create placeholder library folder (hint for users — NOT auto-configured) ──
+REM -- Create placeholder library folder (hint for users - NOT auto-configured)
 set "LIBRARY_DIR=%ROOT%\library"
 if not exist "%LIBRARY_DIR%" mkdir "%LIBRARY_DIR%"
 
-REM ── Generate a random JWT secret on first run ──────────────────────────────
+REM -- Generate a random JWT secret on first run ------------------------------
 set "SECRET_FILE=%DATA_DIR%\.jwt_secret"
 if not exist "%SECRET_FILE%" (
     powershell -Command "[System.Guid]::NewGuid().ToString('N') + [System.Guid]::NewGuid().ToString('N')" > "%SECRET_FILE%"
 )
 set /p JWT_SECRET=<"%SECRET_FILE%"
 
-REM ── Start Ollama (AI engine) if present ────────────────────────────────────
+REM -- Start Ollama (AI engine) if present ------------------------------------
 set "OLLAMA_EXE=%ROOT%\ollama\ollama.exe"
 if exist "%OLLAMA_EXE%" (
     echo Starting AI engine (Ollama)...
@@ -40,7 +40,7 @@ if exist "%OLLAMA_EXE%" (
     echo [INFO] AI tagging will be unavailable. See README for setup instructions.
 )
 
-REM ── Start the app server ───────────────────────────────────────────────────
+REM -- Start the app server ---------------------------------------------------
 echo Starting My3DLibrary server...
 set "SERVER_EXE=%ROOT%\my3dlibrary-server.exe"
 if not exist "%SERVER_EXE%" (
@@ -60,7 +60,7 @@ set "PORTABLE_ROOT=%ROOT%"
 REM Start the server in a minimised window (it stays running in background)
 start /min "My3DLibrary Server" "%SERVER_EXE%"
 
-REM ── Wait for server to be ready (up to 30 seconds) ─────────────────────────
+REM -- Wait for server to be ready (up to 30 seconds) -------------------------
 echo Waiting for server to start...
 set /a TRIES=0
 :WAIT_LOOP
