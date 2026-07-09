@@ -15,7 +15,7 @@ REM ── Set data directory (database + settings live here) ──────
 set "DATA_DIR=%ROOT%\data"
 if not exist "%DATA_DIR%" mkdir "%DATA_DIR%"
 
-REM ── Set library directory (your 3D model files) ────────────────────────────
+REM ── Create placeholder library folder (hint for users — NOT auto-configured) ──
 set "LIBRARY_DIR=%ROOT%\library"
 if not exist "%LIBRARY_DIR%" mkdir "%LIBRARY_DIR%"
 
@@ -54,7 +54,6 @@ REM Set environment variables for the server
 set "NODE_ENV=production"
 set "PORT=3000"
 set "DB_PATH=%DATA_DIR%\library.db"
-set "LIBRARY_PATH=%LIBRARY_DIR%"
 set "OLLAMA_HOST=http://localhost:11434"
 set "PORTABLE_ROOT=%ROOT%"
 
