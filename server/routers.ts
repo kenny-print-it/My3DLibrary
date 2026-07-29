@@ -666,5 +666,29 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  trash: router({
+    list: adminProcedure.query(async () => db.listTrashedFiles()),
+
+    restore: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const result = await db.restoreTrashedFile(input.id);
+        if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.message });
+        return result;
+      }),
+
+    purge: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.purgeTrashedFile(input.id);
+        return { success: true };
+      }),
+
+    purgeAll: adminProcedure.mutation(async () => {
+      await db.purgeAllTrashedFiles();
+      return { success: true };
+    }),
+  }),
 });
 export type AppRouter = typeof appRouter;
