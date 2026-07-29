@@ -415,6 +415,56 @@ export async function updateModelSource(id: number, sourceUrl: string | null) {
   await db.update(models).set({ sourceUrl }).where(eq(models.id, id));
 }
 
+/**
+ * Rename a file (image or model file) within a model's JSON array,
+ * and also rename the actual file on disk if it exists.
+ * fileType: 'image' updates the images[] array; 'model' updates the modelFiles[] array.
+ * fileId: the file's relative path (used as the stable ID in the portable app).
+ */
+export async function renameModelFile(
+  modelId: number,
+  fileType: "image" | "model",
+  fileId: string,
+  newName: string
+) {
+  const db = await getDb();
+  if (!db) return;
+  const rows = await db.select().from(models).where(eq(models.id, modelId)).limit(1);
+  const model = rows[0];
+  if (!model) return;
+  const rootPath = (model as any).rootPath as string | null;
+  if (fileType === "image") {
+    const imgs: any[] = JSON.parse((model.images as any) ?? "[]");
+    // Attempt filesystem rename
+    const entry = imgs.find((img: any) => (img.fileId ?? img.id) === fileId);
+    if (entry && rootPath) {
+      const oldAbs = entry.absPath ?? (rootPath ? path.join(rootPath, fileId) : null);
+      if (oldAbs && fs.existsSync(oldAbs)) {
+        const newAbs = path.join(path.dirname(oldAbs), newName);
+        try { fs.renameSync(oldAbs, newAbs); } catch {}
+      }
+    }
+    const updated = imgs.map((img: any) =>
+      (img.fileId ?? img.id) === fileId ? { ...img, name: newName } : img
+    );
+    await db.update(models).set({ images: JSON.stringify(updated) as any }).where(eq(models.id, modelId));
+  } else {
+    const files: any[] = JSON.parse((model.modelFiles as any) ?? "[]");
+    const entry = files.find((f: any) => (f.fileId ?? f.id) === fileId);
+    if (entry && rootPath) {
+      const oldAbs = entry.absPath ?? (rootPath ? path.join(rootPath, fileId) : null);
+      if (oldAbs && fs.existsSync(oldAbs)) {
+        const newAbs = path.join(path.dirname(oldAbs), newName);
+        try { fs.renameSync(oldAbs, newAbs); } catch {}
+      }
+    }
+    const updated = files.map((f: any) =>
+      (f.fileId ?? f.id) === fileId ? { ...f, name: newName } : f
+    );
+    await db.update(models).set({ modelFiles: JSON.stringify(updated) as any }).where(eq(models.id, modelId));
+  }
+}
+
 export async function bulkTagModels(
   modelIds: number[],
   addTagIds: number[],

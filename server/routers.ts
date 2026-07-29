@@ -516,6 +516,18 @@ export const appRouter = router({
         await db.bulkTagModels(input.modelIds, input.addTagIds, input.removeTagIds);
         return { success: true, count: input.modelIds.length };
       }),
+
+    renameFile: protectedProcedure
+      .input(z.object({
+        modelId: z.number(),
+        fileType: z.enum(["image", "model"]),
+        fileId: z.string(),
+        newName: z.string().min(1).max(512),
+      }))
+      .mutation(async ({ input }) => {
+        await db.renameModelFile(input.modelId, input.fileType, input.fileId, input.newName);
+        return { success: true };
+      }),
   }),
 
   tags: router({

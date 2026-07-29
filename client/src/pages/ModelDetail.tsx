@@ -71,6 +71,8 @@ export default function ModelDetail() {
   const [expandedZips, setExpandedZips] = useState<Set<string>>(new Set());
   const [fileSortBy, setFileSortBy] = useState<"default" | "name_asc" | "name_desc" | "size_asc" | "size_desc">("default");
   const [fileTypeFilter, setFileTypeFilter] = useState<string | null>(null);
+  // Inline rename state: { fileId, fileType, value }
+  const [renamingFile, setRenamingFile] = useState<{ fileId: string; fileType: "image" | "model"; value: string } | null>(null);
   const { user } = useAuth();
   const isOwner = !!(user?.role === "admin" || user?.openId === (window as any).__OWNER_OPEN_ID);
 
@@ -178,6 +180,15 @@ export default function ModelDetail() {
       setNewTagName("");
       setShowTagInput(false);
     },
+  });
+
+  const renameFileMutation = trpc.models.renameFile.useMutation({
+    onSuccess: () => {
+      utils.models.get.invalidate({ id: modelId });
+      setRenamingFile(null);
+      toast.success("File renamed");
+    },
+    onError: () => toast.error("Failed to rename file"),
   });
 
   // Carousel wheel scroll — must be declared before any early returns (Rules of Hooks)
@@ -607,11 +618,24 @@ export default function ModelDetail() {
                   const zipKey = (file as any).absPath || file.id;
                   const isExpanded = expandedZips.has(zipKey);
                   return (
-                    <div key={file.id}>
+                    <div key={(file as any).fileId || file.id}>
                       <div className="flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors group">
                         <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: extColor + "22", color: extColor }}>{fileExt}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-foreground truncate">{file.name}</p>
+                          {renamingFile?.fileId === ((file as any).fileId || file.id) && renamingFile?.fileType === "model" ? (
+                            <form onSubmit={(e) => { e.preventDefault(); const rf = renamingFile; if (rf?.value.trim()) renameFileMutation.mutate({ modelId, fileType: "model", fileId: (file as any).fileId || file.id, newName: rf.value.trim() }); }} className="flex items-center gap-1.5">
+                              <input
+                                autoFocus
+                                value={renamingFile?.value ?? ""}
+                                onChange={(e) => setRenamingFile((r) => r ? { ...r, value: e.target.value } : r)}
+                                className="flex-1 text-sm bg-muted border border-ring rounded px-2 py-0.5 text-foreground focus:outline-none focus:ring-1 focus:ring-ring min-w-0"
+                              />
+                              <button type="submit" disabled={!renamingFile?.value.trim() || renameFileMutation.isPending} className="p-1 text-primary hover:text-primary/80 disabled:opacity-40"><Check className="w-3.5 h-3.5" /></button>
+                              <button type="button" onClick={() => setRenamingFile(null)} className="p-1 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+                            </form>
+                          ) : (
+                            <p className="text-sm text-foreground truncate">{file.name}</p>
+                          )}
                           <p className="text-xs text-muted-foreground">
                             {formatBytes(file.size)}
                             {isZip && <span className="ml-1.5 text-amber-500/70">· click ▾ to view contents</span>}
@@ -628,6 +652,15 @@ export default function ModelDetail() {
                             </button>
                           )}
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {isOwner && (
+                              <button
+                                onClick={() => setRenamingFile({ fileId: (file as any).fileId || file.id, fileType: "model", value: file.name })}
+                                className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                title="Rename file"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             <a href={file.webViewLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="View in Drive">
                               <ExternalLink className="w-3.5 h-3.5" />
                             </a>
