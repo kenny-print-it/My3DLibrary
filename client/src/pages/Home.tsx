@@ -6,7 +6,8 @@ import { trpc } from "@/lib/trpc";
 import {
   Search, Filter, X, Heart, Box, FolderOpen, RefreshCw,
   ArrowUpDown, CheckCheck, ChevronDown, ChevronRight,
-  GripVertical, LayoutList, Settings,
+  GripVertical, LayoutList, Settings, Archive,
+  CheckSquare, Square, Tags,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,17 +64,27 @@ function getModelImageUrl(images: any[] | null | undefined, heroImage: string | 
   return images[0]?.localUrl || images[0]?.thumbnailUrl || images[0]?.thumbnailLink || null;
 }
 
-type SortOption = "name_asc" | "name_desc" | "newest" | "most_files" | "most_renders";
+type SortOption = "name_asc" | "name_desc" | "newest" | "drive_created" | "most_files" | "most_renders";
+
+const SORT_KEY = "printlib_sort_v1";
+const VALID_SORTS: SortOption[] = ["name_asc", "name_desc", "newest", "drive_created", "most_files", "most_renders"];
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "name_asc", label: "A → Z" },
   { value: "name_desc", label: "Z → A" },
   { value: "newest", label: "Newest Scanned" },
+  { value: "drive_created", label: "Newest on Drive" },
   { value: "most_files", label: "Most Files" },
   { value: "most_renders", label: "Most Renders" },
 ];
 
-function ModelCard({ model, onClick }: { model: any; onClick: () => void }) {
+function ModelCard({ model, onClick, selectMode = false, isSelected = false, onToggleSelect }: {
+  model: any;
+  onClick: () => void;
+  selectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
+}) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   // Prefer AI-selected heroImage, fall back to first image — use proxy to avoid expiring Drive URLs
@@ -82,9 +93,24 @@ function ModelCard({ model, onClick }: { model: any; onClick: () => void }) {
   const firstStl = !thumb ? (model.modelFiles as any[] | null)?.find(
     (f: any) => f.name?.toLowerCase().endsWith(".stl") && f.webContentLink
   ) : null;
+  const hasZip = (model.modelFiles as any[] | null)?.some((f: any) => f.name?.toLowerCase().endsWith(".zip"));
 
   return (
-    <div className="model-card group relative rounded-xl overflow-hidden bg-card border border-border/50 cursor-pointer" onClick={onClick}>
+    <div
+      className={cn(
+        "model-card group relative rounded-xl overflow-hidden bg-card border cursor-pointer transition-all",
+        selectMode && isSelected ? "border-primary ring-2 ring-primary/40" : "border-border/50"
+      )}
+      onClick={() => selectMode ? onToggleSelect?.(model.id) : onClick()}
+    >
+      {/* Selection checkbox overlay */}
+      {selectMode && (
+        <div className="absolute top-2 right-2 z-10">
+          {isSelected
+            ? <CheckSquare className="w-5 h-5 text-primary drop-shadow" />
+            : <Square className="w-5 h-5 text-white/80 drop-shadow" />}
+        </div>
+      )}
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
         {!imgLoaded && !imgError && !firstStl && <div className="absolute inset-0 shimmer" />}
         {thumb && !imgError ? (
@@ -111,6 +137,14 @@ function ModelCard({ model, onClick }: { model: any; onClick: () => void }) {
         {model.isFavorite && (
           <div className="absolute top-2 right-2">
             <Heart className="w-4 h-4 fill-primary text-primary" />
+          </div>
+        )}
+        {hasZip && (
+          <div className="absolute top-2 left-2 group-hover:opacity-0 transition-opacity duration-200 pointer-events-none">
+            <span className="flex items-center gap-1 bg-amber-500/80 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 rounded-full">
+              <Archive className="w-2.5 h-2.5" />
+              ZIP
+            </span>
           </div>
         )}
 
@@ -222,10 +256,16 @@ function VirtualModelGrid({
   models,
   isReordering,
   onNavigate,
+  selectMode = false,
+  selectedModels,
+  onToggleSelect,
 }: {
   models: any[];
   isReordering: boolean;
   onNavigate: (path: string) => void;
+  selectMode?: boolean;
+  selectedModels?: Set<number>;
+  onToggleSelect?: (id: number) => void;
 }) {
   const cols = useColumnCount();
   const CARD_HEIGHT = 220; // approximate card height in px
@@ -264,6 +304,9 @@ function VirtualModelGrid({
                 key={model.id}
                 model={model}
                 onClick={() => !isReordering && onNavigate(`/model/${model.id}`)}
+                selectMode={selectMode}
+                isSelected={selectedModels?.has(model.id) ?? false}
+                onToggleSelect={onToggleSelect}
               />
             ))}
           </div>
@@ -280,6 +323,9 @@ function SortableCategoryRow({
   toggle,
   onNavigate,
   onViewAll,
+  selectMode = false,
+  selectedModels,
+  onToggleSelect,
 }: {
   group: { category: any; models: any[] };
   isReordering: boolean;
@@ -287,6 +333,9 @@ function SortableCategoryRow({
   toggle: (id: string) => void;
   onNavigate: (path: string) => void;
   onViewAll: (id: number) => void;
+  selectMode?: boolean;
+  selectedModels?: Set<number>;
+  onToggleSelect?: (id: number) => void;
 }) {
   const catKey = String(group.category.id);
   const isCollapsed = collapsed.has(catKey);
@@ -333,7 +382,7 @@ function SortableCategoryRow({
           )}
         </div>
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-none">
-          <VirtualModelGrid models={group.models} isReordering={isReordering} onNavigate={onNavigate} />
+          <VirtualModelGrid models={group.models} isReordering={isReordering} onNavigate={onNavigate} selectMode={selectMode} selectedModels={selectedModels} onToggleSelect={onToggleSelect} />
         </CollapsibleContent>
       </Collapsible>
     </div>
@@ -345,11 +394,17 @@ function CategoryGallery({
   onNavigate,
   onViewAll,
   isAdmin,
+  selectMode = false,
+  selectedModels,
+  onToggleSelect,
 }: {
   groups: { category: any; models: any[] }[];
   onNavigate: (path: string) => void;
   onViewAll: (id: number) => void;
   isAdmin: boolean;
+  selectMode?: boolean;
+  selectedModels?: Set<number>;
+  onToggleSelect?: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
   const allCategoryIds = useMemo(() => groups.map((g) => String(g.category.id)), [groups]);
@@ -445,6 +500,9 @@ function CategoryGallery({
               toggle={toggle}
               onNavigate={onNavigate}
               onViewAll={onViewAll}
+              selectMode={selectMode}
+              selectedModels={selectedModels}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </SortableContext>
@@ -460,7 +518,23 @@ export default function Home() {
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [selectedFileType, setSelectedFileType] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>("name_asc");
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedModels, setSelectedModels] = useState<Set<number>>(new Set());
+  const [showBulkTagDialog, setShowBulkTagDialog] = useState(false);
+  const [bulkAddTags, setBulkAddTags] = useState<number[]>([]);
+  const [bulkRemoveTags, setBulkRemoveTags] = useState<number[]>([]);
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    try {
+      const saved = localStorage.getItem(SORT_KEY);
+      if (saved && VALID_SORTS.includes(saved as SortOption)) return saved as SortOption;
+    } catch {}
+    return "name_asc";
+  });
+  const handleSortChange = (v: string) => {
+    const sort = v as SortOption;
+    setSortBy(sort);
+    try { localStorage.setItem(SORT_KEY, sort); } catch {}
+  };
   const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   const { user } = useAuth();
@@ -516,6 +590,36 @@ export default function Home() {
   // Only fires when the library is configured (has paths set up).
   const autoScanFired = useRef(false);
   const utils = trpc.useUtils();
+
+  const bulkTagMutation = trpc.models.bulkTag.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Tags updated for ${data.count} model${data.count !== 1 ? "s" : ""}`);
+      utils.models.list.invalidate();
+      setShowBulkTagDialog(false);
+      setBulkMode(false);
+      setSelectedModels(new Set());
+      setBulkAddTags([]);
+      setBulkRemoveTags([]);
+    },
+    onError: () => toast.error("Failed to update tags"),
+  });
+
+  const toggleModelSelection = (id: number) => {
+    setSelectedModels((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const exitBulkMode = () => {
+    setBulkMode(false);
+    setSelectedModels(new Set());
+    setShowBulkTagDialog(false);
+    setBulkAddTags([]);
+    setBulkRemoveTags([]);
+  };
+
   const startScanMutation = trpc.scan.start.useMutation({
     onSuccess: () => {
       // Refresh models periodically while the scan runs so cards appear as they are indexed
@@ -571,7 +675,7 @@ export default function Home() {
           {/* Sort dropdown */}
           <div className="flex items-center gap-1.5">
             <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+            <Select value={sortBy} onValueChange={handleSortChange}>
               <SelectTrigger className="h-9 w-40 bg-secondary border-border/50 text-sm text-foreground focus:ring-ring">
                 <SelectValue />
               </SelectTrigger>
@@ -636,6 +740,22 @@ export default function Home() {
             <Heart className={cn("w-4 h-4", favoritesOnly ? "fill-primary-foreground" : "")} />
           </button>
 
+          {/* Bulk select toggle */}
+          {isAdmin && (
+            <button
+              onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
+                bulkMode
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-secondary text-muted-foreground border-border/50 hover:text-foreground"
+              )}
+            >
+              <CheckSquare className="w-4 h-4" />
+              {bulkMode ? "Exit Select" : "Select"}
+            </button>
+          )}
+
           {/* Filters toggle */}
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -654,6 +774,91 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {/* Bulk action bar */}
+      {bulkMode && (
+        <div className="mb-4 p-3 rounded-xl bg-primary/10 border border-primary/30 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-medium text-primary">
+            {selectedModels.size} model{selectedModels.size !== 1 ? "s" : ""} selected
+          </span>
+          <button
+            onClick={() => setSelectedModels(new Set(models.map((m: any) => m.id)))}
+            className="text-xs px-2 py-1 rounded-lg bg-secondary text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
+          >Select All</button>
+          <button
+            onClick={() => setSelectedModels(new Set())}
+            className="text-xs px-2 py-1 rounded-lg bg-secondary text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
+          >Clear</button>
+          <div className="flex-1" />
+          <button
+            disabled={selectedModels.size === 0}
+            onClick={() => setShowBulkTagDialog(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Tags className="w-4 h-4" />
+            Tag Selected
+          </button>
+        </div>
+      )}
+
+      {/* Bulk Tag Dialog */}
+      {showBulkTagDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBulkTagDialog(false)}>
+          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-foreground mb-1">Bulk Tag</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Apply tag changes to {selectedModels.size} selected model{selectedModels.size !== 1 ? "s" : ""}.
+            </p>
+            {/* Add tags */}
+            <div className="mb-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Add Tags</p>
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => setBulkAddTags((prev) => prev.includes(tag.id) ? prev.filter((t) => t !== tag.id) : [...prev, tag.id])}
+                    className="px-3 py-1 rounded-full text-sm transition-colors border"
+                    style={bulkAddTags.includes(tag.id)
+                      ? { backgroundColor: tag.color ?? "#6366f1", color: "#fff", borderColor: tag.color ?? "#6366f1" }
+                      : { backgroundColor: (tag.color ?? "#6366f1") + "22", color: tag.color ?? "#6366f1", borderColor: (tag.color ?? "#6366f1") + "44" }}
+                  >{tag.name}</button>
+                ))}
+                {allTags.length === 0 && <p className="text-sm text-muted-foreground">No tags yet. Create tags in any model first.</p>}
+              </div>
+            </div>
+            {/* Remove tags */}
+            <div className="mb-6">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Remove Tags</p>
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => setBulkRemoveTags((prev) => prev.includes(tag.id) ? prev.filter((t) => t !== tag.id) : [...prev, tag.id])}
+                    className="px-3 py-1 rounded-full text-sm transition-colors border"
+                    style={bulkRemoveTags.includes(tag.id)
+                      ? { backgroundColor: "#ef444433", color: "#ef4444", borderColor: "#ef444466" }
+                      : { backgroundColor: "transparent", color: "var(--muted-foreground)", borderColor: "var(--border)" }}
+                  >{tag.name}</button>
+                ))}
+                {allTags.length === 0 && <p className="text-sm text-muted-foreground">No tags available.</p>}
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowBulkTagDialog(false)}
+                className="px-4 py-2 rounded-lg text-sm bg-secondary text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
+              >Cancel</button>
+              <button
+                disabled={(bulkAddTags.length === 0 && bulkRemoveTags.length === 0) || bulkTagMutation.isPending}
+                onClick={() => bulkTagMutation.mutate({ modelIds: Array.from(selectedModels), addTagIds: bulkAddTags, removeTagIds: bulkRemoveTags })}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {bulkTagMutation.isPending ? "Applying…" : "Apply Tags"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter Panel */}
       {showFilters && (
@@ -877,13 +1082,13 @@ export default function Home() {
               )}
             </div>
           ) : (
-            <VirtualModelGrid models={models} isReordering={false} onNavigate={navigate} />
+            <VirtualModelGrid models={models} isReordering={false} onNavigate={navigate} selectMode={bulkMode} selectedModels={selectedModels} onToggleSelect={toggleModelSelection} />
           )}
         </div>
       )}
 
       {/* Grouped by category */}
-      {!modelsLoading && grouped && <CategoryGallery groups={grouped} onNavigate={navigate} onViewAll={setSelectedCategory} isAdmin={isAdmin} />}
+      {!modelsLoading && grouped && <CategoryGallery groups={grouped} onNavigate={navigate} onViewAll={setSelectedCategory} isAdmin={isAdmin} selectMode={bulkMode} selectedModels={selectedModels} onToggleSelect={toggleModelSelection} />}
     </div>
   );
 }

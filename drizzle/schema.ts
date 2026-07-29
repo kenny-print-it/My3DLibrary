@@ -63,6 +63,8 @@ export const models = sqliteTable("models", {
   heroImageSource: text("heroImageSource", { enum: ["ai", "manual"] }),
   driveCreatedAt: integer("driveCreatedAt", { mode: "timestamp_ms" }),
   customNotes: text("customNotes"),
+  printSettings: text("printSettings"),
+  sourceUrl: text("sourceUrl"),
   isFavorite: integer("isFavorite", { mode: "boolean" }).default(false),
   tagsLockedAt: integer("tagsLockedAt", { mode: "timestamp_ms" }),
   lastScanned: integer("lastScanned", { mode: "timestamp_ms" }).default(now),

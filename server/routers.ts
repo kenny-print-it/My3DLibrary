@@ -1,4 +1,6 @@
 import { z } from "zod";
+import yauzl from "yauzl";
+import * as fs from "fs";
 import { parse as parseCookie } from "cookie";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -329,7 +331,7 @@ export const appRouter = router({
         categoryId: z.number().optional(),
         tagIds: z.array(z.number()).optional(),
         fileType: z.string().optional(),
-        sortBy: z.enum(["name_asc", "name_desc", "newest", "most_files", "most_renders"]).optional(),
+        sortBy: z.enum(["name_asc", "name_desc", "newest", "drive_created", "most_files", "most_renders"]).optional(),
         favoritesOnly: z.boolean().optional(),
       }).optional())
       .query(async ({ input }) => db.getAllModels(input)),
@@ -351,10 +353,27 @@ export const appRouter = router({
         return { ...model, tags: modelTags, localFolderPath };
       }),
     updateMeta: protectedProcedure
-      .input(z.object({ id: z.number(), customNotes: z.string().optional(), isFavorite: z.boolean().optional(), categoryId: z.number().optional() }))
+      .input(z.object({
+        id: z.number(),
+        customNotes: z.string().optional(),
+        isFavorite: z.boolean().optional(),
+        categoryId: z.number().optional(),
+        printSettings: z.object({
+          material: z.string().optional(),
+          layerHeight: z.string().optional(),
+          infillDensity: z.string().optional(),
+          infillPattern: z.string().optional(),
+          supports: z.string().optional(),
+          supportSpacing: z.string().optional(),
+          supportInterfaceLayers: z.string().optional(),
+          printSpeed: z.string().optional(),
+          wallCount: z.string().optional(),
+          nozzleSize: z.string().optional(),
+        }).nullable().optional(),
+      }))
       .mutation(async ({ input }) => {
-        const { id, ...data } = input;
-        await db.updateModelMeta(id, data);
+        const { id, printSettings, ...rest } = input;
+        await db.updateModelMeta(id, { ...rest, printSettings: printSettings as Record<string,string> | null | undefined });
         return { success: true };
       }),
     count: protectedProcedure.query(async () => db.getModelCount()),
@@ -375,6 +394,31 @@ export const appRouter = router({
         // Clears both heroImage and heroImageSource so AI can re-pick on next scan
         await db.clearModelHeroImage(input.id);
         return { success: true };
+      }),
+
+    zipContents: protectedProcedure
+      .input(z.object({ filePath: z.string(), fileName: z.string() }))
+      .query(async ({ input }) => {
+        if (!fs.existsSync(input.filePath)) throw new Error("ZIP file not found");
+        return new Promise<{ name: string; size: number; isDirectory: boolean }[]>((resolve, reject) => {
+          const entries: { name: string; size: number; isDirectory: boolean }[] = [];
+          yauzl.open(input.filePath, { lazyEntries: true }, (err, zipfile) => {
+            if (err || !zipfile) return reject(err || new Error("Could not open ZIP"));
+            zipfile.readEntry();
+            zipfile.on("entry", (entry) => {
+              const isDirectory = /\/$/.test(entry.fileName);
+              if (!isDirectory) {
+                entries.push({ name: entry.fileName, size: entry.uncompressedSize, isDirectory: false });
+              }
+              zipfile.readEntry();
+            });
+            zipfile.on("end", () => {
+              entries.sort((a, b) => a.name.localeCompare(b.name));
+              resolve(entries);
+            });
+            zipfile.on("error", reject);
+          });
+        });
       }),
 
     rescanOne: adminProcedure
@@ -453,6 +497,24 @@ export const appRouter = router({
           filesFound: modelFiles.length,
           movedToCategory,
         };
+      }),
+
+    updateSource: protectedProcedure
+      .input(z.object({ id: z.number(), sourceUrl: z.string().nullable() }))
+      .mutation(async ({ input }) => {
+        await db.updateModelSource(input.id, input.sourceUrl);
+        return { success: true };
+      }),
+
+    bulkTag: protectedProcedure
+      .input(z.object({
+        modelIds: z.array(z.number()).min(1),
+        addTagIds: z.array(z.number()).default([]),
+        removeTagIds: z.array(z.number()).default([]),
+      }))
+      .mutation(async ({ input }) => {
+        await db.bulkTagModels(input.modelIds, input.addTagIds, input.removeTagIds);
+        return { success: true, count: input.modelIds.length };
       }),
   }),
 

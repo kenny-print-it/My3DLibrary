@@ -76,7 +76,7 @@ async function startServer() {
   registerAuthRoutes(app);
 
   // Health check
-  app.get("/api/health", (_req, res) => res.json({ ok: true, version: "1.0.0-local" }));
+  app.get("/api/health", (_req, res) => res.json({ ok: true, version: "1.2.0-local" }));
 
   // ZIP bulk download endpoint
   app.get("/api/download/zip/:modelId", zipDownloadHandler);

@@ -283,20 +283,25 @@ export async function getAllModels(filters?: {
   categoryId?: number;
   tagIds?: number[];
   fileType?: string;
-  sortBy?: "name_asc" | "name_desc" | "newest" | "most_files" | "most_renders";
+  sortBy?: "name_asc" | "name_desc" | "newest" | "drive_created" | "most_files" | "most_renders";
   favoritesOnly?: boolean;
 }) {
   const db = await getDb();
   if (!db) return [];
 
   // Helper to apply client-side sort to a result set
-  function applySort<T extends { name: string; fileCount: number | null; imageCount: number | null; lastScanned: Date | null }>(rows: T[]): T[] {
+  function applySort<T extends { name: string; fileCount: number | null; imageCount: number | null; lastScanned: Date | null; driveCreatedAt?: Date | null }>(rows: T[]): T[] {
     const sortBy = filters?.sortBy;
     if (!sortBy) return rows;
     return [...rows].sort((a, b) => {
       if (sortBy === "name_asc") return a.name.localeCompare(b.name);
       if (sortBy === "name_desc") return b.name.localeCompare(a.name);
       if (sortBy === "newest") return (b.lastScanned?.getTime() ?? 0) - (a.lastScanned?.getTime() ?? 0);
+      if (sortBy === "drive_created") {
+        const bTime = (b.driveCreatedAt?.getTime() ?? b.lastScanned?.getTime() ?? 0);
+        const aTime = (a.driveCreatedAt?.getTime() ?? a.lastScanned?.getTime() ?? 0);
+        return bTime - aTime;
+      }
       if (sortBy === "most_files") return (b.fileCount ?? 0) - (a.fileCount ?? 0);
       if (sortBy === "most_renders") return (b.imageCount ?? 0) - (a.imageCount ?? 0);
       return 0;
@@ -373,11 +378,16 @@ export async function getModelById(id: number) {
 
 export async function updateModelMeta(
   id: number,
-  data: { customNotes?: string; isFavorite?: boolean; categoryId?: number }
+  data: { customNotes?: string; isFavorite?: boolean; categoryId?: number; printSettings?: Record<string,string> | null; sourceUrl?: string | null }
 ) {
   const db = await getDb();
   if (!db) return;
-  await db.update(models).set(data).where(eq(models.id, id));
+  const { printSettings, ...rest } = data;
+  const updateData: Record<string, unknown> = { ...rest };
+  if (printSettings !== undefined) {
+    updateData.printSettings = printSettings ? JSON.stringify(printSettings) : null;
+  }
+  await db.update(models).set(updateData as any).where(eq(models.id, id));
 }
 
 export async function updateModelHeroImage(id: number, heroImage: string | null, source: "ai" | "manual" = "ai") {
@@ -397,6 +407,38 @@ export async function getModelCount() {
   if (!db) return 0;
   const result = await db.select({ count: sql<number>`count(*)` }).from(models);
   return result[0]?.count ?? 0;
+}
+
+export async function updateModelSource(id: number, sourceUrl: string | null) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(models).set({ sourceUrl }).where(eq(models.id, id));
+}
+
+export async function bulkTagModels(
+  modelIds: number[],
+  addTagIds: number[],
+  removeTagIds: number[]
+) {
+  const db = await getDb();
+  if (!db) return;
+  // Remove tags first
+  if (removeTagIds.length > 0) {
+    await db.delete(modelTags).where(
+      and(inArray(modelTags.modelId, modelIds), inArray(modelTags.tagId, removeTagIds))
+    );
+  }
+  // Add tags — insert ignore duplicates
+  if (addTagIds.length > 0) {
+    const rows = modelIds.flatMap((modelId) =>
+      addTagIds.map((tagId) => ({ modelId, tagId }))
+    );
+    for (const row of rows) {
+      try {
+        await db.insert(modelTags).values(row);
+      } catch { /* ignore duplicate */ }
+    }
+  }
 }
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
@@ -707,7 +749,7 @@ CREATE TABLE IF NOT EXISTS \`categories\` (\n\t\`id\` integer PRIMARY KEY AUTOIN
 CREATE UNIQUE INDEX IF NOT EXISTS \`categories_driveId_unique\` ON \`categories\` (\`driveId\`);
 CREATE TABLE IF NOT EXISTS \`library_paths\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`path\` text NOT NULL,\n\t\`label\` text NOT NULL,\n\t\`enabled\` integer DEFAULT true NOT NULL,\n\t\`scanDepth\` integer DEFAULT 2 NOT NULL,\n\t\`sortOrder\` integer DEFAULT 0 NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
 CREATE TABLE IF NOT EXISTS \`model_tags\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`modelId\` integer NOT NULL,\n\t\`tagId\` integer NOT NULL\n);
-CREATE TABLE IF NOT EXISTS \`models\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`driveId\` text,\n\t\`name\` text NOT NULL,\n\t\`categoryId\` integer,\n\t\`path\` text,\n\t\`images\` text DEFAULT '[]',\n\t\`modelFiles\` text DEFAULT '[]',\n\t\`files\` text DEFAULT '[]',\n\t\`fileCount\` integer DEFAULT 0,\n\t\`imageCount\` integer DEFAULT 0,\n\t\`thumbnailUrl\` text,\n\t\`heroImage\` text,\n\t\`heroImageSource\` text,\n\t\`driveCreatedAt\` integer,\n\t\`customNotes\` text,\n\t\`isFavorite\` integer DEFAULT false,\n\t\`tagsLockedAt\` integer,\n\t\`lastScanned\` integer DEFAULT (unixepoch('now') * 1000),\n\t\`rootPath\` text,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE TABLE IF NOT EXISTS \`models\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`driveId\` text,\n\t\`name\` text NOT NULL,\n\t\`categoryId\` integer,\n\t\`path\` text,\n\t\`images\` text DEFAULT '[]',\n\t\`modelFiles\` text DEFAULT '[]',\n\t\`files\` text DEFAULT '[]',\n\t\`fileCount\` integer DEFAULT 0,\n\t\`imageCount\` integer DEFAULT 0,\n\t\`thumbnailUrl\` text,\n\t\`heroImage\` text,\n\t\`heroImageSource\` text,\n\t\`driveCreatedAt\` integer,\n\t\`customNotes\` text,\n\t\`isFavorite\` integer DEFAULT false,\n\t\`tagsLockedAt\` integer,\n\t\`lastScanned\` integer DEFAULT (unixepoch('now') * 1000),\n\t\`rootPath\` text,\n\t\`printSettings\` text,\n\t\`sourceUrl\` text,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
 CREATE UNIQUE INDEX IF NOT EXISTS \`models_driveId_unique\` ON \`models\` (\`driveId\`);
 CREATE TABLE IF NOT EXISTS \`resources\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`name\` text NOT NULL,\n\t\`url\` text NOT NULL,\n\t\`logoUrl\` text,\n\t\`description\` text,\n\t\`sortOrder\` integer DEFAULT 0 NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
 CREATE TABLE IF NOT EXISTS \`scan_logs\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`status\` text DEFAULT 'running' NOT NULL,\n\t\`modelsFound\` integer DEFAULT 0,\n\t\`categoriesFound\` integer DEFAULT 0,\n\t\`errorMessage\` text,\n\t\`startedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`completedAt\` integer\n);
@@ -735,6 +777,14 @@ export async function initDbIfNeeded(): Promise<void> {
   try {
     sqlite.exec("ALTER TABLE library_paths ADD COLUMN scanDepth integer DEFAULT 2 NOT NULL;");
     console.log("[DB Migrate] Added scanDepth column to library_paths.");
+  } catch { /* column already exists — ignore */ }
+  try {
+    sqlite.exec("ALTER TABLE models ADD COLUMN printSettings text;");
+    console.log("[DB Migrate] Added printSettings column to models.");
+  } catch { /* column already exists — ignore */ }
+  try {
+    sqlite.exec("ALTER TABLE models ADD COLUMN sourceUrl text;");
+    console.log("[DB Migrate] Added sourceUrl column to models.");
   } catch { /* column already exists — ignore */ }
   if (tables.n === 0) {
     // Apply embedded migration SQL (no file system dependency)

@@ -180,7 +180,7 @@ export default function About() {
           <CardContent className="pt-6">
             <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
               About My3DLibrary
-              <Badge variant="secondary">v1.0 Beta</Badge>
+              <Badge variant="secondary">v1.2 Beta</Badge>
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               My3DLibrary is a self-hosted 3D model library created by Kenny Print It? to help
@@ -197,7 +197,7 @@ export default function About() {
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground pb-4">
-          <p>My3DLibrary v1.0 Beta — Created by Kenny Print It?</p>
+          <p>My3DLibrary v1.2 Beta — Created by Kenny Print It?</p>
           <p className="mt-1">3D Printing &amp; Designs — Hobby, Cosplay, Toys, Gadgets &amp; Mods</p>
         </div>
       </div>

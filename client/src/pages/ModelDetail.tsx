@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Heart, ExternalLink, Download, Box, ChevronLeft, ChevronRight,
-  Tag, Plus, X, Pencil, Check, FolderOpen, FileBox, Archive, FileText, File, Star
+  Tag, Plus, X, Pencil, Check, FolderOpen, FileBox, Archive, FileText, File, Star, Settings2,
+  Search, ArrowUpDown, ChevronDown, ChevronUp, Package, Link
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import STLViewer from "@/components/STLViewer";
@@ -37,7 +38,19 @@ export default function ModelDetail() {
   // Always start at the top of the page when navigating to a model
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
+    setScrolled(false);
+    setFileSearch("");
+    setFileSortBy("default");
+    setFileTypeFilter(null);
+    setExpandedZips(new Set());
   }, [modelId]);
+
+  // Track scroll position to show/hide sticky title bar
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 80);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const [activeImg, setActiveImg] = useState(0);
   const [lightbox, setLightbox] = useState(false);
@@ -48,6 +61,16 @@ export default function ModelDetail() {
   const [showTagInput, setShowTagInput] = useState(false);
   const [editingCatLabel, setEditingCatLabel] = useState(false);
   const [catLabelValue, setCatLabelValue] = useState("");
+  const [editingPrintSettings, setEditingPrintSettings] = useState(false);
+  const [printSettingsValue, setPrintSettingsValue] = useState<Record<string,string>>({});
+  const [editingSource, setEditingSource] = useState(false);
+  const [sourceValue, setSourceValue] = useState("");
+  const [scrolled, setScrolled] = useState(false);
+  // File search / sort / filter (must be declared before any early returns)
+  const [fileSearch, setFileSearch] = useState("");
+  const [expandedZips, setExpandedZips] = useState<Set<string>>(new Set());
+  const [fileSortBy, setFileSortBy] = useState<"default" | "name_asc" | "name_desc" | "size_asc" | "size_desc">("default");
+  const [fileTypeFilter, setFileTypeFilter] = useState<string | null>(null);
   const { user } = useAuth();
   const isOwner = !!(user?.role === "admin" || user?.openId === (window as any).__OWNER_OPEN_ID);
 
@@ -58,13 +81,25 @@ export default function ModelDetail() {
     {
       enabled: !!modelId,
       onSuccess: (data: any) => {
-        if (data) setNotesValue(data.customNotes || "");
+        if (data) {
+          setNotesValue(data.customNotes || "");
+          setPrintSettingsValue((data.printSettings as Record<string,string>) || {});
+          setSourceValue((data as any).sourceUrl || "");
+        }
       },
     } as any
   );
 
   const { data: allTags = [] } = trpc.tags.list.useQuery();
   const { data: categories = [] } = trpc.categories.list.useQuery();
+
+  const saveSource = trpc.models.updateSource.useMutation({
+    onSuccess: () => {
+      setEditingSource(false);
+      utils.models.get.invalidate({ id: modelId });
+      toast.success("Source saved");
+    },
+  });
 
   const toggleFavorite = trpc.models.updateMeta.useMutation({
     onSuccess: () => utils.models.get.invalidate({ id: modelId }),
@@ -75,6 +110,14 @@ export default function ModelDetail() {
       setEditingNotes(false);
       utils.models.get.invalidate({ id: modelId });
       toast.success("Notes saved");
+    },
+  });
+
+  const savePrintSettings = trpc.models.updateMeta.useMutation({
+    onSuccess: () => {
+      setEditingPrintSettings(false);
+      utils.models.get.invalidate({ id: modelId });
+      toast.success("Print settings saved");
     },
   });
 
@@ -201,15 +244,19 @@ export default function ModelDetail() {
     );
   }
 
-  const images: any[] = model.images as any[] || [];
+  const rawImages: any[] = model.images as any[] || [];
   const heroImageUrl: string | null = (model as any).heroImage || null;
-  // Find the active image index matching the current heroImage (match by fileId)
+  // Find the hero image index so we can sort it to the front
   const heroIdx = heroImageUrl
-    ? images.findIndex((img) =>
+    ? rawImages.findIndex((img) =>
         img.thumbnailLink === heroImageUrl ||
         img.webContentLink === heroImageUrl
       )
     : -1;
+  // Always show hero image first in the carousel
+  const images: any[] = heroIdx > 0
+    ? [rawImages[heroIdx], ...rawImages.filter((_, i) => i !== heroIdx)]
+    : rawImages;
   // First STL for viewer fallback
   const firstStlFile = images.length === 0
     ? (model.modelFiles as any[] | null)?.find((f: any) => f.name?.toLowerCase().endsWith(".stl") && f.webContentLink) ?? null
@@ -227,7 +274,30 @@ export default function ModelDetail() {
     if (MODEL_EXTS.has(ext)) return 2;
     return 3;
   };
-  const modelFiles = [...rawFiles].sort((a, b) => getFilePriority(a.name) - getFilePriority(b.name));
+  // Derive the unique file extensions present in this model
+  const availableFileTypes = Array.from(
+    new Set(rawFiles.map((f) => f.name?.split(".").pop()?.toLowerCase()).filter(Boolean))
+  ).sort() as string[];
+
+  // Build the displayed file list: apply search + type filter + sort
+  const modelFiles = (() => {
+    let files = [...rawFiles];
+    if (fileSearch.trim()) {
+      const q = fileSearch.trim().toLowerCase();
+      files = files.filter((f) => f.name?.toLowerCase().includes(q));
+    }
+    if (fileTypeFilter) {
+      files = files.filter((f) => f.name?.toLowerCase().endsWith(`.${fileTypeFilter}`));
+    }
+    switch (fileSortBy) {
+      case "name_asc": files.sort((a, b) => a.name.localeCompare(b.name)); break;
+      case "name_desc": files.sort((a, b) => b.name.localeCompare(a.name)); break;
+      case "size_asc": files.sort((a, b) => Number(a.size) - Number(b.size)); break;
+      case "size_desc": files.sort((a, b) => Number(b.size) - Number(a.size)); break;
+      default: files.sort((a, b) => getFilePriority(a.name) - getFilePriority(b.name));
+    }
+    return files;
+  })();
   const modelTags: any[] = (model as any).tags || [];
   const category = categories.find((c) => c.id === model.categoryId);
 
@@ -241,6 +311,27 @@ export default function ModelDetail() {
 
   return (
     <div className="container py-8">
+      {/* Sticky title bar — slides in after scrolling 80px */}
+      <div className={cn(
+        "fixed top-14 left-0 right-0 z-40 border-b border-border/50 bg-background/90 backdrop-blur-sm transition-all duration-200",
+        scrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"
+      )}>
+        <div className="container flex items-center gap-3 h-12">
+          <button onClick={() => navigate("/")} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Library
+          </button>
+          <span className="text-muted-foreground/40 text-xs">/</span>
+          <span className="text-sm font-medium text-foreground truncate flex-1">{model.name}</span>
+          <button
+            onClick={() => toggleFavorite.mutate({ id: modelId, isFavorite: !model.isFavorite })}
+            className={cn("p-1.5 rounded-lg transition-colors shrink-0", model.isFavorite ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10")}
+          >
+            <Heart className={cn("w-4 h-4", model.isFavorite && "fill-current")} />
+          </button>
+        </div>
+      </div>
+
       {/* Header row: back button + admin actions */}
       <div className="flex items-center justify-between mb-6">
         <button
@@ -276,6 +367,37 @@ export default function ModelDetail() {
         )}
       </div>
 
+      {/* Model title — shown above the image carousel */}
+      <div className="flex items-start gap-3 mb-6">
+        <div className="flex-1">
+          <h1 className="text-2xl font-semibold text-foreground leading-tight">{model.name}</h1>
+          {category && (
+            <div className="flex items-center gap-1.5 mt-1.5 text-sm text-muted-foreground">
+              <FolderOpen className="w-3.5 h-3.5 shrink-0" />
+              {editingCatLabel ? (
+                <form onSubmit={(e) => { e.preventDefault(); if (catLabelValue.trim()) updateCategoryLabel.mutate({ driveId: category.driveId ?? "", customLabel: catLabelValue.trim() }); }} className="flex items-center gap-1">
+                  <input autoFocus value={catLabelValue} onChange={(e) => setCatLabelValue(e.target.value)} className="text-sm bg-muted border border-border rounded px-2 py-0.5 text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-40" placeholder="Custom label…" />
+                  <button type="submit" className="p-1 text-primary hover:text-primary/80"><Check className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => setEditingCatLabel(false)} className="p-1 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+                </form>
+              ) : (
+                <button onClick={() => { setCatLabelValue(category.customLabel || category.name); setEditingCatLabel(true); }} className="flex items-center gap-1 hover:text-foreground transition-colors group" title="Edit collection label">
+                  <span>{category.customLabel || category.name}</span>
+                  <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => toggleFavorite.mutate({ id: modelId, isFavorite: !model.isFavorite })}
+          className={cn("p-2 rounded-lg transition-colors", model.isFavorite ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10")}
+          title={model.isFavorite ? "Remove from favorites" : "Add to favorites"}
+        >
+          <Heart className={cn("w-5 h-5", model.isFavorite && "fill-current")} />
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
         {/* Left: Image carousel */}
         <div className="lg:col-span-3 space-y-3">
@@ -300,7 +422,7 @@ export default function ModelDetail() {
               </div>
             )}
             {/* Hero image badge */}
-            {images.length > 0 && heroIdx === activeImg && (
+            {images.length > 0 && activeImg === 0 && heroImageUrl && (
               <div className="absolute top-3 left-3 flex items-center gap-2">
                 <div className="flex items-center gap-1 bg-amber-500/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full">
                   <Star className="w-3 h-3 fill-black" /> Hero
@@ -346,12 +468,16 @@ export default function ModelDetail() {
             <div className="space-y-1.5">
               {images.length > 1 && (
                 <p className="text-xs text-muted-foreground">
-                  {isOwner ? "Click a photo to view · hover for \"Set as Hero\" option" : "Click a photo to view"}
+                  {isOwner && !heroImageUrl
+                    ? "No hero set — hover a photo and click \"Set as Hero\" to pin it first"
+                    : isOwner
+                    ? "Click a photo to view · hover for \"Set as Hero\" option"
+                    : "Click a photo to view"}
                 </p>
               )}
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {images.map((img, i) => {
-                  const isHero = i === heroIdx;
+                  const isHero = i === 0 && !!heroImageUrl;
                   return (
                     <div key={img.fileId || img.thumbnailLink} className="relative shrink-0 group/thumb">
                       <button
@@ -397,13 +523,14 @@ export default function ModelDetail() {
             </div>
           )}
 
-          {/* Model files — grouped by extension */}
+          {/* Model files — with search, sort, and type filter */}
           <div className="rounded-xl bg-card border border-border/50 overflow-hidden">
+            {/* Header row */}
             <div className="px-4 py-3 border-b border-border/50 flex items-center gap-2">
               <FileBox className="w-4 h-4 text-muted-foreground" />
               <h3 className="text-sm font-medium text-foreground">Files</h3>
-              <span className="text-xs text-muted-foreground">{modelFiles.length} file{modelFiles.length !== 1 ? "s" : ""}</span>
-              {modelFiles.length > 0 && (
+              <span className="text-xs text-muted-foreground">{rawFiles.length} file{rawFiles.length !== 1 ? "s" : ""}{(fileSearch || fileTypeFilter) && modelFiles.length !== rawFiles.length ? ` · ${modelFiles.length} shown` : ""}</span>
+              {rawFiles.length > 0 && (
                 <a
                   href={`/api/download/zip/${modelId}`}
                   download
@@ -415,8 +542,60 @@ export default function ModelDetail() {
                 </a>
               )}
             </div>
+            {/* Search + Sort + Type filter toolbar */}
+            {rawFiles.length > 0 && (
+              <div className="px-4 py-2.5 border-b border-border/30 flex flex-wrap items-center gap-2 bg-muted/20">
+                {/* Search */}
+                <div className="relative flex-1 min-w-32">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search files…"
+                    value={fileSearch}
+                    onChange={(e) => setFileSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border/50 rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  {fileSearch && (
+                    <button onClick={() => setFileSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                {/* Sort */}
+                <div className="flex items-center gap-1">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <select
+                    value={fileSortBy}
+                    onChange={(e) => setFileSortBy(e.target.value as any)}
+                    className="text-xs bg-background border border-border/50 rounded-md px-2 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="default">Default</option>
+                    <option value="name_asc">Name A→Z</option>
+                    <option value="name_desc">Name Z→A</option>
+                    <option value="size_asc">Smallest first</option>
+                    <option value="size_desc">Largest first</option>
+                  </select>
+                </div>
+                {/* Type filter pills */}
+                {availableFileTypes.length > 1 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {availableFileTypes.map((ft) => (
+                      <button
+                        key={ft}
+                        onClick={() => setFileTypeFilter(fileTypeFilter === ft ? null : ft)}
+                        className={cn("px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wide transition-colors",
+                          fileTypeFilter === ft ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
+                        )}
+                      >{ft}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {modelFiles.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-muted-foreground">No model files found in this folder or its subfolders</div>
+              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                {fileSearch || fileTypeFilter ? "No files match your search or filter." : "No model files found in this folder or its subfolders"}
+              </div>
             ) : (
               <div className="divide-y divide-border/30">
                 {modelFiles.map((file) => {
@@ -424,23 +603,45 @@ export default function ModelDetail() {
                   const fileExt = dotIdx >= 0 ? file.name.slice(dotIdx + 1).toUpperCase() : "FILE";
                   const extColors: Record<string, string> = { STL: "#6366f1", OBJ: "#8b5cf6", "3MF": "#14b8a6", STEP: "#f97316", STP: "#f97316", GCODE: "#22c55e", PDF: "#ef4444", TXT: "#94a3b8", MD: "#94a3b8", DOC: "#3b82f6", DOCX: "#3b82f6", ZIP: "#eab308", PNG: "#22c55e", JPG: "#22c55e", JPEG: "#22c55e" };
                   const extColor = extColors[fileExt] || "#6b7280";
+                  const isZip = fileExt === "ZIP";
+                  const zipKey = (file as any).absPath || file.id;
+                  const isExpanded = expandedZips.has(zipKey);
                   return (
-                    <div key={file.id} className="flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors group">
-                      <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: extColor + "22", color: extColor }}>{fileExt}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground truncate">{file.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
+                    <div key={file.id}>
+                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors group">
+                        <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: extColor + "22", color: extColor }}>{fileExt}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-foreground truncate">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatBytes(file.size)}
+                            {isZip && <span className="ml-1.5 text-amber-500/70">· click ▾ to view contents</span>}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {isZip && (file as any).absPath && (
+                            <button
+                              onClick={() => setExpandedZips(prev => { const next = new Set(prev); next.has(zipKey) ? next.delete(zipKey) : next.add(zipKey); return next; })}
+                              className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                              title={isExpanded ? "Collapse ZIP contents" : "View files inside ZIP"}
+                            >
+                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <a href={file.webViewLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="View in Drive">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                            {file.webContentLink && (
+                              <a href={file.webContentLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Download">
+                                <Download className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <a href={file.webViewLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="View in Drive">
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                        {file.webContentLink && (
-                          <a href={file.webContentLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Download">
-                            <Download className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                      </div>
+                      {isZip && isExpanded && (file as any).absPath && (
+                        <ZipContentsPanel filePath={(file as any).absPath} fileName={file.name} />
+                      )}
                     </div>
                   );
                 })}
@@ -451,37 +652,6 @@ export default function ModelDetail() {
 
         {/* Right: Metadata panel */}
         <div className="lg:col-span-2 space-y-5">
-          {/* Title & favorite */}
-          <div className="flex items-start gap-3">
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold text-foreground leading-tight">{model.name}</h1>
-              {category && (
-                <div className="flex items-center gap-1.5 mt-1.5 text-sm text-muted-foreground">
-                  <FolderOpen className="w-3.5 h-3.5 shrink-0" />
-                  {editingCatLabel ? (
-                    <form onSubmit={(e) => { e.preventDefault(); if (catLabelValue.trim()) updateCategoryLabel.mutate({ driveId: category.driveId ?? "", customLabel: catLabelValue.trim() }); }} className="flex items-center gap-1">
-                      <input autoFocus value={catLabelValue} onChange={(e) => setCatLabelValue(e.target.value)} className="text-sm bg-muted border border-border rounded px-2 py-0.5 text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-40" placeholder="Custom label…" />
-                      <button type="submit" className="p-1 text-primary hover:text-primary/80"><Check className="w-3.5 h-3.5" /></button>
-                      <button type="button" onClick={() => setEditingCatLabel(false)} className="p-1 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
-                    </form>
-                  ) : (
-                    <button onClick={() => { setCatLabelValue(category.customLabel || category.name); setEditingCatLabel(true); }} className="flex items-center gap-1 hover:text-foreground transition-colors group" title="Edit collection label">
-                      <span>{category.customLabel || category.name}</span>
-                      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => toggleFavorite.mutate({ id: modelId, isFavorite: !model.isFavorite })}
-              className={cn("p-2 rounded-lg transition-colors", model.isFavorite ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10")}
-              title={model.isFavorite ? "Remove from favorites" : "Add to favorites"}
-            >
-              <Heart className={cn("w-5 h-5", model.isFavorite && "fill-current")} />
-            </button>
-          </div>
-
           {/* Path */}
           <div className="rounded-lg bg-muted/50 px-3 py-2.5">
             <p className="text-xs text-muted-foreground font-medium mb-1">Path</p>
@@ -560,6 +730,152 @@ export default function ModelDetail() {
                   ))}
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Print Settings */}
+          <div className="rounded-xl bg-card border border-border/50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Settings2 className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium text-foreground">Recommended Print Settings</h3>
+              {!editingPrintSettings ? (
+                <button onClick={() => { setPrintSettingsValue((model as any).printSettings || {}); setEditingPrintSettings(true); }} className="ml-auto p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <div className="ml-auto flex gap-1">
+                  <button onClick={() => setEditingPrintSettings(false)} className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"><X className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => savePrintSettings.mutate({ id: modelId, printSettings: Object.keys(printSettingsValue).length ? printSettingsValue as any : null })} className="p-1 rounded-md text-primary hover:bg-primary/10 transition-colors"><Check className="w-3.5 h-3.5" /></button>
+                </div>
+              )}
+            </div>
+
+            {editingPrintSettings ? (
+              <div className="space-y-2.5">
+                {([
+                  { key: "material", label: "Material", placeholder: "e.g. PLA, PETG, ABS, Resin" },
+                  { key: "layerHeight", label: "Layer Height", placeholder: "e.g. 0.2mm" },
+                  { key: "infillDensity", label: "Infill Density", placeholder: "e.g. 15%" },
+                  { key: "infillPattern", label: "Infill Pattern", placeholder: "e.g. Gyroid, Grid, Honeycomb" },
+                  { key: "supports", label: "Supports", placeholder: "Yes / No / Custom" },
+                ] as const).map(({ key, label, placeholder }) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground w-28 shrink-0">{label}</label>
+                    <input
+                      type="text"
+                      value={printSettingsValue[key] || ""}
+                      onChange={(e) => setPrintSettingsValue((prev) => ({ ...prev, [key]: e.target.value }))}
+                      placeholder={placeholder}
+                      className="flex-1 px-2.5 py-1.5 text-xs rounded-md bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                ))}
+                {/* Support sub-fields — only shown when supports is not 'no' */}
+                {(printSettingsValue["supports"] || "").toLowerCase() !== "no" && (
+                  <>
+                    {([
+                      { key: "supportSpacing", label: "Support Spacing", placeholder: "e.g. Z distance 0.2mm" },
+                      { key: "supportInterfaceLayers", label: "Interface Layers", placeholder: "e.g. 2 layers" },
+                    ] as const).map(({ key, label, placeholder }) => (
+                      <div key={key} className="flex items-center gap-2 pl-3 border-l-2 border-primary/30">
+                        <label className="text-xs text-muted-foreground w-28 shrink-0">{label}</label>
+                        <input
+                          type="text"
+                          value={printSettingsValue[key] || ""}
+                          onChange={(e) => setPrintSettingsValue((prev) => ({ ...prev, [key]: e.target.value }))}
+                          placeholder={placeholder}
+                          className="flex-1 px-2.5 py-1.5 text-xs rounded-md bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                      </div>
+                    ))}
+                  </>
+                )}
+                {([
+                  { key: "printSpeed", label: "Print Speed", placeholder: "e.g. 60mm/s" },
+                  { key: "wallCount", label: "Wall Count", placeholder: "e.g. 3 perimeters" },
+                  { key: "nozzleSize", label: "Nozzle Size", placeholder: "e.g. 0.4mm" },
+                ] as const).map(({ key, label, placeholder }) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground w-28 shrink-0">{label}</label>
+                    <input
+                      type="text"
+                      value={printSettingsValue[key] || ""}
+                      onChange={(e) => setPrintSettingsValue((prev) => ({ ...prev, [key]: e.target.value }))}
+                      placeholder={placeholder}
+                      className="flex-1 px-2.5 py-1.5 text-xs rounded-md bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              (() => {
+                const ps = (model as any).printSettings as Record<string,string> | null;
+                const LABELS: Record<string,string> = {
+                  material: "Material", layerHeight: "Layer Height", infillDensity: "Infill Density",
+                  infillPattern: "Infill Pattern", supports: "Supports",
+                  supportSpacing: "Support Spacing", supportInterfaceLayers: "Interface Layers",
+                  printSpeed: "Print Speed", wallCount: "Wall Count", nozzleSize: "Nozzle Size",
+                };
+                const supportsNo = (ps?.supports || "").toLowerCase() === "no";
+                const visibleKeys = Object.keys(LABELS).filter((k) => {
+                  if (supportsNo && (k === "supportSpacing" || k === "supportInterfaceLayers")) return false;
+                  return true;
+                });
+                const hasAny = ps && visibleKeys.some((k) => ps[k]);
+                if (!hasAny) return (
+                  <p className="text-xs text-muted-foreground italic">No print settings yet. Click the edit icon to add some.</p>
+                );
+                return (
+                  <dl className="space-y-1.5">
+                    {visibleKeys.filter((k) => ps?.[k]).map((k) => (
+                      <div key={k} className={cn("flex items-baseline gap-2", (k === "supportSpacing" || k === "supportInterfaceLayers") && "pl-3 border-l-2 border-primary/30")}>
+                        <dt className="text-xs text-muted-foreground w-28 shrink-0">{LABELS[k]}</dt>
+                        <dd className="text-xs text-foreground font-medium">{ps![k]}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                );
+              })()
+            )}
+          </div>
+
+          {/* Source Link */}
+          <div className="rounded-xl bg-card border border-border/50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Link className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium text-foreground">Source</h3>
+              {!editingSource ? (
+                <button onClick={() => setEditingSource(true)} className="ml-auto p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <div className="ml-auto flex gap-1">
+                  <button onClick={() => { setEditingSource(false); setSourceValue((model as any).sourceUrl || ""); }} className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"><X className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => saveSource.mutate({ id: modelId, sourceUrl: sourceValue.trim() || null })} className="p-1 rounded-md text-primary hover:bg-primary/10 transition-colors"><Check className="w-3.5 h-3.5" /></button>
+                </div>
+              )}
+            </div>
+            {editingSource ? (
+              <input
+                type="url"
+                value={sourceValue}
+                onChange={(e) => setSourceValue(e.target.value)}
+                placeholder="https://www.printables.com/model/..."
+                className="w-full px-3 py-2 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                onKeyDown={(e) => { if (e.key === "Enter") saveSource.mutate({ id: modelId, sourceUrl: sourceValue.trim() || null }); if (e.key === "Escape") { setEditingSource(false); setSourceValue((model as any).sourceUrl || ""); } }}
+              />
+            ) : (model as any).sourceUrl ? (
+              <a
+                href={(model as any).sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-primary hover:underline truncate"
+              >
+                <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{(model as any).sourceUrl}</span>
+              </a>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No source set. Click the edit icon to add one.</p>
             )}
           </div>
 
@@ -643,6 +959,83 @@ export default function ModelDetail() {
             </div>
             <div className="text-white/50 text-xs max-w-xs truncate text-center">{images[activeImg].name}</div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ZIP Contents Panel ────────────────────────────────────────────────────────
+function ZipContentsPanel({ filePath, fileName }: { filePath: string; fileName: string }) {
+  const [zipSearch, setZipSearch] = useState("");
+  const { data, isLoading, error } = trpc.models.zipContents.useQuery(
+    { filePath, fileName },
+    { staleTime: 5 * 60 * 1000 }
+  );
+  const extColors: Record<string, string> = { STL: "#6366f1", OBJ: "#8b5cf6", "3MF": "#14b8a6", STEP: "#f97316", STP: "#f97316", GCODE: "#22c55e", PDF: "#ef4444", TXT: "#94a3b8", MD: "#94a3b8", DOC: "#3b82f6", DOCX: "#3b82f6", ZIP: "#eab308", PNG: "#22c55e", JPG: "#22c55e", JPEG: "#22c55e" };
+  const filteredEntries = data ? (zipSearch.trim() ? data.filter(e => e.name.toLowerCase().includes(zipSearch.trim().toLowerCase())) : data) : [];
+  return (
+    <div className="ml-8 mr-4 mb-2 rounded-md border border-border/40 bg-muted/30 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30 bg-muted/50">
+        <Package className="w-3.5 h-3.5 text-amber-500" />
+        <span className="text-xs font-medium text-muted-foreground">Contents of {fileName}</span>
+        {data && (
+          <span className="ml-auto text-xs text-muted-foreground">
+            {zipSearch.trim() ? `${filteredEntries.length} / ${data.length}` : `${data.length} file${data.length !== 1 ? "s" : ""}`}
+            {data.length > 0 && !zipSearch.trim() && ` · ${formatBytes(data.reduce((sum, e) => sum + e.size, 0))} uncompressed`}
+          </span>
+        )}
+      </div>
+      {data && data.length > 5 && (
+        <div className="px-3 py-2 border-b border-border/20 bg-muted/20">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search files in ZIP…"
+              value={zipSearch}
+              onChange={e => setZipSearch(e.target.value)}
+              className="w-full pl-6 pr-6 py-1 text-xs bg-background/50 border border-border/40 rounded text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+            {zipSearch && (
+              <button onClick={() => setZipSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {isLoading && (
+        <div className="px-3 py-4 text-xs text-muted-foreground text-center">Loading ZIP contents…</div>
+      )}
+      {error && (
+        <div className="px-3 py-4 text-xs text-destructive text-center">Could not read ZIP: {error.message}</div>
+      )}
+      {data && data.length === 0 && (
+        <div className="px-3 py-4 text-xs text-muted-foreground text-center">ZIP is empty</div>
+      )}
+      {data && filteredEntries.length === 0 && zipSearch.trim() && (
+        <div className="px-3 py-4 text-xs text-muted-foreground text-center">No files match "{zipSearch}"</div>
+      )}
+      {data && filteredEntries.length > 0 && (
+        <div className="divide-y divide-border/20 max-h-64 overflow-y-auto">
+          {filteredEntries.map((entry, i) => {
+            const dotIdx = entry.name.lastIndexOf(".");
+            const ext = dotIdx >= 0 ? entry.name.slice(dotIdx + 1).toUpperCase() : "FILE";
+            const color = extColors[ext] || "#6b7280";
+            const displayName = entry.name.includes("/") ? entry.name.split("/").pop()! : entry.name;
+            const folder = entry.name.includes("/") ? entry.name.substring(0, entry.name.lastIndexOf("/")) : null;
+            return (
+              <div key={i} className="flex items-center gap-2.5 px-3 py-2 hover:bg-accent/20 transition-colors">
+                <span className="shrink-0 text-[9px] font-mono font-bold px-1 py-0.5 rounded" style={{ backgroundColor: color + "22", color }}>{ext}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-foreground truncate">{displayName}</p>
+                  {folder && <p className="text-[10px] text-muted-foreground/60 truncate">{folder}/</p>}
+                </div>
+                <span className="text-[10px] text-muted-foreground shrink-0">{formatBytes(entry.size)}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

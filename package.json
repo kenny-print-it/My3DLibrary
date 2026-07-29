@@ -1,6 +1,6 @@
 {
   "name": "printlib-local",
-  "version": "1.0.0-beta",
+  "version": "1.2.0-beta",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -52,6 +52,7 @@
     "@types/bcrypt": "^5.0.2",
     "@types/bcryptjs": "^3.0.0",
     "@types/three": "^0.184.1",
+    "@types/yauzl": "^3.4.0",
     "archiver": "^8.0.0",
     "axios": "^1.12.0",
     "bcrypt": "^5.1.1",
@@ -88,6 +89,7 @@
     "three": "^0.184.0",
     "vaul": "^1.1.2",
     "wouter": "^3.3.5",
+    "yauzl": "^3.4.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
