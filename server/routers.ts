@@ -532,7 +532,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    deleteFile: adminProcedure
+    deleteFile: protectedProcedure
       .input(z.object({
         modelId: z.number(),
         fileType: z.enum(["image", "model"]),
@@ -703,9 +703,9 @@ export const appRouter = router({
   }),
 
   trash: router({
-    list: adminProcedure.query(async () => db.listTrashedFiles()),
+    list: protectedProcedure.query(async () => db.listTrashedFiles()),
 
-    restore: adminProcedure
+    restore: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const result = await db.restoreTrashedFile(input.id);
@@ -713,20 +713,20 @@ export const appRouter = router({
         return result;
       }),
 
-    purge: adminProcedure
+    purge: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await db.purgeTrashedFile(input.id);
         return { success: true };
       }),
 
-    purgeAll: adminProcedure.mutation(async () => {
+    purgeAll: protectedProcedure.mutation(async () => {
       await db.purgeAllTrashedFiles();
       return { success: true };
     }),
 
     // ── Model-level trash ──────────────────────────────────────────────────
-    deleteModel: adminProcedure
+    deleteModel: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const result = await db.deleteModel(input.id);
@@ -734,9 +734,9 @@ export const appRouter = router({
         return result;
       }),
 
-    listModels: adminProcedure.query(async () => db.listTrashedModels()),
+    listModels: protectedProcedure.query(async () => db.listTrashedModels()),
 
-    restoreModel: adminProcedure
+    restoreModel: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const result = await db.restoreTrashedModel(input.id);
@@ -744,14 +744,14 @@ export const appRouter = router({
         return result;
       }),
 
-    purgeModel: adminProcedure
+    purgeModel: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await db.purgeTrashedModel(input.id);
         return { success: true };
       }),
 
-    purgeAllModels: adminProcedure.mutation(async () => {
+    purgeAllModels: protectedProcedure.mutation(async () => {
       await db.purgeAllTrashedModels();
       return { success: true };
     }),

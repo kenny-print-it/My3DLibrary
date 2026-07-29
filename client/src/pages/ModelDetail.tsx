@@ -200,7 +200,7 @@ export default function ModelDetail() {
       setDeletingFile(null);
       toast.success("File deleted from disk");
     },
-    onError: () => toast.error("Failed to delete file"),
+    onError: (err) => toast.error(`Failed to delete file: ${err.message}`),
   });
 
   const openFolderMutation = trpc.models.openFolder.useMutation({
