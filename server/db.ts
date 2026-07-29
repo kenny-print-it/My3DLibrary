@@ -465,6 +465,46 @@ export async function renameModelFile(
   }
 }
 
+/**
+ * Remove a file (image or model file) from a model's JSON array,
+ * and also delete the actual file from disk if it exists.
+ */
+export async function deleteModelFile(
+  modelId: number,
+  fileType: "image" | "model",
+  fileId: string
+) {
+  const db = await getDb();
+  if (!db) return;
+  const rows = await db.select().from(models).where(eq(models.id, modelId)).limit(1);
+  const model = rows[0];
+  if (!model) return;
+  const rootPath = (model as any).rootPath as string | null;
+  if (fileType === "image") {
+    const imgs: any[] = JSON.parse((model.images as any) ?? "[]");
+    const entry = imgs.find((img: any) => (img.fileId ?? img.id) === fileId);
+    if (entry && rootPath) {
+      const absFile = entry.absPath ?? (rootPath ? path.join(rootPath, fileId) : null);
+      if (absFile && fs.existsSync(absFile)) {
+        try { fs.unlinkSync(absFile); } catch {}
+      }
+    }
+    const updated = imgs.filter((img: any) => (img.fileId ?? img.id) !== fileId);
+    await db.update(models).set({ images: JSON.stringify(updated) as any, imageCount: updated.length }).where(eq(models.id, modelId));
+  } else {
+    const files: any[] = JSON.parse((model.modelFiles as any) ?? "[]");
+    const entry = files.find((f: any) => (f.fileId ?? f.id) === fileId);
+    if (entry && rootPath) {
+      const absFile = entry.absPath ?? (rootPath ? path.join(rootPath, fileId) : null);
+      if (absFile && fs.existsSync(absFile)) {
+        try { fs.unlinkSync(absFile); } catch {}
+      }
+    }
+    const updated = files.filter((f: any) => (f.fileId ?? f.id) !== fileId);
+    await db.update(models).set({ modelFiles: JSON.stringify(updated) as any, fileCount: updated.length }).where(eq(models.id, modelId));
+  }
+}
+
 export async function bulkTagModels(
   modelIds: number[],
   addTagIds: number[],

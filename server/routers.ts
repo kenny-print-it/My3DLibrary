@@ -531,6 +531,17 @@ export const appRouter = router({
         await db.renameModelFile(input.modelId, input.fileType, input.fileId, input.newName);
         return { success: true };
       }),
+
+    deleteFile: adminProcedure
+      .input(z.object({
+        modelId: z.number(),
+        fileType: z.enum(["image", "model"]),
+        fileId: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.deleteModelFile(input.modelId, input.fileType, input.fileId);
+        return { success: true };
+      }),
   }),
 
   tags: router({

@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Heart, ExternalLink, Download, Box, ChevronLeft, ChevronRight,
   Tag, Plus, X, Pencil, Check, FolderOpen, FileBox, Archive, FileText, File, Star, Settings2,
-  Search, ArrowUpDown, ChevronDown, ChevronUp, Package, Link
+  Search, ArrowUpDown, ChevronDown, ChevronUp, Package, Link, Trash2
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import STLViewer from "@/components/STLViewer";
@@ -73,6 +73,7 @@ export default function ModelDetail() {
   const [fileTypeFilter, setFileTypeFilter] = useState<string | null>(null);
   // Inline rename state: { fileId, fileType, value }
   const [renamingFile, setRenamingFile] = useState<{ fileId: string; fileType: "image" | "model"; value: string } | null>(null);
+  const [deletingFile, setDeletingFile] = useState<{ fileId: string; fileType: "image" | "model"; name: string } | null>(null);
   const { user } = useAuth();
   const isOwner = !!(user?.role === "admin" || user?.openId === (window as any).__OWNER_OPEN_ID);
 
@@ -189,6 +190,16 @@ export default function ModelDetail() {
       toast.success("File renamed");
     },
     onError: () => toast.error("Failed to rename file"),
+  });
+
+  const deleteFileMutation = trpc.models.deleteFile.useMutation({
+    onSuccess: () => {
+      utils.models.get.invalidate({ id: modelId });
+      utils.models.list.invalidate();
+      setDeletingFile(null);
+      toast.success("File deleted from disk");
+    },
+    onError: () => toast.error("Failed to delete file"),
   });
 
   // Carousel wheel scroll — must be declared before any early returns (Rules of Hooks)
@@ -653,13 +664,22 @@ export default function ModelDetail() {
                           )}
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             {isOwner && (
-                              <button
-                                onClick={() => setRenamingFile({ fileId: (file as any).fileId || file.id, fileType: "model", value: file.name })}
-                                className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                                title="Rename file"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => setRenamingFile({ fileId: (file as any).fileId || file.id, fileType: "model", value: file.name })}
+                                  className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                  title="Rename file"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setDeletingFile({ fileId: (file as any).fileId || file.id, fileType: "model", name: file.name })}
+                                  className="p-1.5 rounded-md hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
+                                  title="Delete file from disk"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
                             )}
                             <a href={file.webViewLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="View in Drive">
                               <ExternalLink className="w-3.5 h-3.5" />
@@ -994,11 +1014,38 @@ export default function ModelDetail() {
           </div>
         </div>
       )}
+
+      {/* Delete file confirmation dialog */}
+      {deletingFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDeletingFile(null)}>
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-red-500/10 shrink-0">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Delete file?</h3>
+                <p className="text-sm text-muted-foreground mt-1">This permanently deletes <span className="font-medium text-foreground">{deletingFile.name}</span> from your disk. This cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setDeletingFile(null)} className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-accent transition-colors">Cancel</button>
+              <button
+                onClick={() => deleteFileMutation.mutate({ modelId, fileType: deletingFile.fileType, fileId: deletingFile.fileId })}
+                disabled={deleteFileMutation.isPending}
+                className="px-3 py-1.5 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
+              >
+                {deleteFileMutation.isPending ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── ZIP Contents Panel ────────────────────────────────────────────────────────
+// ── ZIP Contents Panel ─────────────────────────────────────────────────────────────────────────────────────
 function ZipContentsPanel({ filePath, fileName }: { filePath: string; fileName: string }) {
   const [zipSearch, setZipSearch] = useState("");
   const { data, isLoading, error } = trpc.models.zipContents.useQuery(
