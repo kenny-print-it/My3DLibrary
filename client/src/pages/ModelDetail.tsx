@@ -74,6 +74,7 @@ export default function ModelDetail() {
   // Inline rename state: { fileId, fileType, value }
   const [renamingFile, setRenamingFile] = useState<{ fileId: string; fileType: "image" | "model"; value: string } | null>(null);
   const [deletingFile, setDeletingFile] = useState<{ fileId: string; fileType: "image" | "model"; name: string } | null>(null);
+  const [confirmDeleteModel, setConfirmDeleteModel] = useState(false);
   const { user } = useAuth();
   const isOwner = !!(user?.role === "admin" || user?.openId === (window as any).__OWNER_OPEN_ID);
 
@@ -200,6 +201,15 @@ export default function ModelDetail() {
       toast.success("File deleted from disk");
     },
     onError: () => toast.error("Failed to delete file"),
+  });
+
+  const deleteModelMutation = trpc.trash.deleteModel.useMutation({
+    onSuccess: (res) => {
+      utils.models.list.invalidate();
+      toast.success(res.message);
+      navigate("/");
+    },
+    onError: (err) => toast.error(`Failed to delete model: ${err.message}`),
   });
 
   // Carousel wheel scroll — must be declared before any early returns (Rules of Hooks)
@@ -365,6 +375,15 @@ export default function ModelDetail() {
         </button>
 
         {isOwner && (
+          <div className="flex items-center gap-2">
+          <button
+            onClick={() => setConfirmDeleteModel(true)}
+            className="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/5 hover:bg-red-500/15 text-red-400 hover:text-red-300 transition-all"
+            title="Move this model to trash"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete Model
+          </button>
           <button
             onClick={() => rescanOne.mutate({ id: modelId })}
             disabled={rescanOne.isPending}
@@ -386,6 +405,7 @@ export default function ModelDetail() {
               </>
             )}
           </button>
+          </div>
         )}
       </div>
 
@@ -1011,6 +1031,35 @@ export default function ModelDetail() {
               {activeImg + 1} <span className="text-white/50">/</span> {images.length}
             </div>
             <div className="text-white/50 text-xs max-w-xs truncate text-center">{images[activeImg].name}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete model confirmation dialog */}
+      {confirmDeleteModel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDeleteModel(false)}>
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-red-500/10 shrink-0">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Delete model?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  <span className="font-medium text-foreground">{model?.name}</span> and its entire folder will be moved to the Trash. You can restore it from <span className="font-medium text-foreground">Settings → Trash</span>.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmDeleteModel(false)} className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-accent transition-colors">Cancel</button>
+              <button
+                onClick={() => deleteModelMutation.mutate({ id: modelId })}
+                disabled={deleteModelMutation.isPending}
+                className="px-3 py-1.5 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
+              >
+                {deleteModelMutation.isPending ? "Deleting..." : "Move to Trash"}
+              </button>
+            </div>
           </div>
         </div>
       )}
