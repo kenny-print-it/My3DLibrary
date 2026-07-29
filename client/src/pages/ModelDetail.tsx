@@ -679,7 +679,15 @@ export default function ModelDetail() {
                               <button type="button" onClick={() => setRenamingFile(null)} className="p-1 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
                             </form>
                           ) : (
-                            <p className="text-sm text-foreground truncate">{file.name}</p>
+                            <p
+                              className={`text-sm text-foreground truncate ${
+                                (file as any).absPath ? "cursor-pointer hover:text-primary hover:underline transition-colors" : ""
+                              }`}
+                              title={(file as any).absPath ? "Click to open with default app" : undefined}
+                              onClick={() => {
+                                if ((file as any).absPath) openFileMutation.mutate({ filePath: (file as any).absPath });
+                              }}
+                            >{file.name}</p>
                           )}
                           <p className="text-xs text-muted-foreground">
                             {formatBytes(file.size)}
