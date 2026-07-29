@@ -7,7 +7,7 @@ import {
   Search, Filter, X, Heart, Box, FolderOpen, RefreshCw,
   ArrowUpDown, CheckCheck, ChevronDown, ChevronRight,
   GripVertical, LayoutList, Settings, Archive,
-  CheckSquare, Square, Tags,
+  CheckSquare, Square, Tags, Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -76,6 +76,11 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "drive_created", label: "Newest on Drive" },
   { value: "most_files", label: "Most Files" },
   { value: "most_renders", label: "Most Renders" },
+];
+
+const TAG_COLORS = [
+  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316",
+  "#eab308", "#22c55e", "#14b8a6", "#06b6d4", "#3b82f6",
 ];
 
 function ModelCard({ model, onClick, selectMode = false, isSelected = false, onToggleSelect }: {
@@ -523,6 +528,10 @@ export default function Home() {
   const [showBulkTagDialog, setShowBulkTagDialog] = useState(false);
   const [bulkAddTags, setBulkAddTags] = useState<number[]>([]);
   const [bulkRemoveTags, setBulkRemoveTags] = useState<number[]>([]);
+  const [bulkTagSearch, setBulkTagSearch] = useState("");
+  const [bulkNewTagName, setBulkNewTagName] = useState("");
+  const [bulkNewTagColor, setBulkNewTagColor] = useState(TAG_COLORS[0]);
+  const [bulkShowNewTag, setBulkShowNewTag] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     try {
       const saved = localStorage.getItem(SORT_KEY);
@@ -591,6 +600,18 @@ export default function Home() {
   const autoScanFired = useRef(false);
   const utils = trpc.useUtils();
 
+  const bulkCreateTagMutation = trpc.tags.create.useMutation({
+    onSuccess: (tag) => {
+      if (tag) {
+        setBulkAddTags((prev) => prev.includes(tag.id) ? prev : [...prev, tag.id]);
+        utils.tags.list.invalidate();
+      }
+      setBulkNewTagName("");
+      setBulkShowNewTag(false);
+    },
+    onError: () => toast.error("Failed to create tag"),
+  });
+
   const bulkTagMutation = trpc.models.bulkTag.useMutation({
     onSuccess: (data) => {
       toast.success(`Tags updated for ${data.count} model${data.count !== 1 ? "s" : ""}`);
@@ -618,6 +639,9 @@ export default function Home() {
     setShowBulkTagDialog(false);
     setBulkAddTags([]);
     setBulkRemoveTags([]);
+    setBulkTagSearch("");
+    setBulkNewTagName("");
+    setBulkShowNewTag(false);
   };
 
   const startScanMutation = trpc.scan.start.useMutation({
@@ -802,63 +826,128 @@ export default function Home() {
       )}
 
       {/* Bulk Tag Dialog */}
-      {showBulkTagDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBulkTagDialog(false)}>
-          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-foreground mb-1">Bulk Tag</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Apply tag changes to {selectedModels.size} selected model{selectedModels.size !== 1 ? "s" : ""}.
-            </p>
-            {/* Add tags */}
-            <div className="mb-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Add Tags</p>
-              <div className="flex flex-wrap gap-2">
-                {allTags.map((tag) => (
+      {showBulkTagDialog && (() => {
+        const filteredTags = bulkTagSearch.trim()
+          ? allTags.filter((t) => t.name.toLowerCase().includes(bulkTagSearch.toLowerCase()))
+          : allTags;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBulkTagDialog(false)}>
+            <div className="bg-card border border-border rounded-xl w-full max-w-lg shadow-xl flex flex-col" style={{ maxHeight: "90vh" }} onClick={(e) => e.stopPropagation()}>
+              {/* Header */}
+              <div className="p-5 pb-3 border-b border-border/50 shrink-0">
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-lg font-semibold text-foreground">Bulk Tag</h2>
+                  <button onClick={() => setShowBulkTagDialog(false)} className="text-muted-foreground hover:text-foreground transition-colors"><X className="w-4 h-4" /></button>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Apply tag changes to {selectedModels.size} selected model{selectedModels.size !== 1 ? "s" : ""}.
+                </p>
+                {/* Search + New Tag */}
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search tags…"
+                      value={bulkTagSearch}
+                      onChange={(e) => setBulkTagSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
                   <button
-                    key={tag.id}
-                    onClick={() => setBulkAddTags((prev) => prev.includes(tag.id) ? prev.filter((t) => t !== tag.id) : [...prev, tag.id])}
-                    className="px-3 py-1 rounded-full text-sm transition-colors border"
-                    style={bulkAddTags.includes(tag.id)
-                      ? { backgroundColor: tag.color ?? "#6366f1", color: "#fff", borderColor: tag.color ?? "#6366f1" }
-                      : { backgroundColor: (tag.color ?? "#6366f1") + "22", color: tag.color ?? "#6366f1", borderColor: (tag.color ?? "#6366f1") + "44" }}
-                  >{tag.name}</button>
-                ))}
-                {allTags.length === 0 && <p className="text-sm text-muted-foreground">No tags yet. Create tags in any model first.</p>}
+                    onClick={() => setBulkShowNewTag((v) => !v)}
+                    className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors", bulkShowNewTag ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-muted-foreground border-border/50 hover:text-foreground")}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> New Tag
+                  </button>
+                </div>
+                {/* Inline new-tag form */}
+                {bulkShowNewTag && (
+                  <div className="mt-3 p-3 rounded-lg bg-secondary/60 border border-border/50 space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Tag name…"
+                        value={bulkNewTagName}
+                        onChange={(e) => setBulkNewTagName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && bulkNewTagName.trim()) bulkCreateTagMutation.mutate({ name: bulkNewTagName.trim(), color: bulkNewTagColor }); }}
+                        className="flex-1 px-2.5 py-1.5 text-xs rounded-md bg-card border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => { if (bulkNewTagName.trim()) bulkCreateTagMutation.mutate({ name: bulkNewTagName.trim(), color: bulkNewTagColor }); }}
+                        disabled={!bulkNewTagName.trim() || bulkCreateTagMutation.isPending}
+                        className="px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium disabled:opacity-40 transition-opacity"
+                      >
+                        {bulkCreateTagMutation.isPending ? "…" : "Add"}
+                      </button>
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {TAG_COLORS.map((c) => (
+                        <button key={c} onClick={() => setBulkNewTagColor(c)} className={cn("w-5 h-5 rounded-full transition-all", bulkNewTagColor === c ? "ring-2 ring-white ring-offset-1 ring-offset-card scale-110" : "")} style={{ backgroundColor: c }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-            {/* Remove tags */}
-            <div className="mb-6">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Remove Tags</p>
-              <div className="flex flex-wrap gap-2">
-                {allTags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    onClick={() => setBulkRemoveTags((prev) => prev.includes(tag.id) ? prev.filter((t) => t !== tag.id) : [...prev, tag.id])}
-                    className="px-3 py-1 rounded-full text-sm transition-colors border"
-                    style={bulkRemoveTags.includes(tag.id)
-                      ? { backgroundColor: "#ef444433", color: "#ef4444", borderColor: "#ef444466" }
-                      : { backgroundColor: "transparent", color: "var(--muted-foreground)", borderColor: "var(--border)" }}
-                  >{tag.name}</button>
-                ))}
-                {allTags.length === 0 && <p className="text-sm text-muted-foreground">No tags available.</p>}
+
+              {/* Scrollable body */}
+              <div className="overflow-y-auto flex-1 p-5 space-y-5">
+                {/* Add tags */}
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Add Tags</p>
+                  <div className="flex flex-wrap gap-2">
+                    {filteredTags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        onClick={() => setBulkAddTags((prev) => prev.includes(tag.id) ? prev.filter((t) => t !== tag.id) : [...prev, tag.id])}
+                        className="px-3 py-1 rounded-full text-sm transition-colors border"
+                        style={bulkAddTags.includes(tag.id)
+                          ? { backgroundColor: tag.color ?? "#6366f1", color: "#fff", borderColor: tag.color ?? "#6366f1" }
+                          : { backgroundColor: (tag.color ?? "#6366f1") + "22", color: tag.color ?? "#6366f1", borderColor: (tag.color ?? "#6366f1") + "44" }}
+                      >{tag.name}</button>
+                    ))}
+                    {filteredTags.length === 0 && <p className="text-sm text-muted-foreground">{bulkTagSearch ? `No tags match "${bulkTagSearch}"` : "No tags yet. Use the New Tag button above."}</p>}
+                  </div>
+                </div>
+
+                {/* Remove tags */}
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Remove Tags</p>
+                  <div className="flex flex-wrap gap-2">
+                    {filteredTags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        onClick={() => setBulkRemoveTags((prev) => prev.includes(tag.id) ? prev.filter((t) => t !== tag.id) : [...prev, tag.id])}
+                        className="px-3 py-1 rounded-full text-sm transition-colors border"
+                        style={bulkRemoveTags.includes(tag.id)
+                          ? { backgroundColor: "#ef444433", color: "#ef4444", borderColor: "#ef444466" }
+                          : { backgroundColor: "transparent", color: "var(--muted-foreground)", borderColor: "var(--border)" }}
+                      >{tag.name}</button>
+                    ))}
+                    {filteredTags.length === 0 && <p className="text-sm text-muted-foreground">{bulkTagSearch ? `No tags match "${bulkTagSearch}"` : "No tags available."}</p>}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowBulkTagDialog(false)}
-                className="px-4 py-2 rounded-lg text-sm bg-secondary text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
-              >Cancel</button>
-              <button
-                disabled={(bulkAddTags.length === 0 && bulkRemoveTags.length === 0) || bulkTagMutation.isPending}
-                onClick={() => bulkTagMutation.mutate({ modelIds: Array.from(selectedModels), addTagIds: bulkAddTags, removeTagIds: bulkRemoveTags })}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {bulkTagMutation.isPending ? "Applying…" : "Apply Tags"}
-              </button>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-border/50 flex gap-3 justify-end shrink-0">
+                <button
+                  onClick={() => setShowBulkTagDialog(false)}
+                  className="px-4 py-2 rounded-lg text-sm bg-secondary text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
+                >Cancel</button>
+                <button
+                  disabled={(bulkAddTags.length === 0 && bulkRemoveTags.length === 0) || bulkTagMutation.isPending}
+                  onClick={() => bulkTagMutation.mutate({ modelIds: Array.from(selectedModels), addTagIds: bulkAddTags, removeTagIds: bulkRemoveTags })}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {bulkTagMutation.isPending ? "Applying…" : "Apply Tags"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Filter Panel */}
       {showFilters && (
