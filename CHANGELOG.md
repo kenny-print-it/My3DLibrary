@@ -4,6 +4,31 @@ All notable changes to My3DLibrary are documented here.
 
 ---
 
+## [v1.2.0-beta] — 2026-07-29
+
+### New Features
+
+**Print Settings card on model detail**
+A new "Recommended Print Settings" card has been added to the model detail page, positioned above the Notes section. It lets you record Material, Layer Height, Infill Density, Infill Pattern, and Support recommendation for each model. When Support is set to "No", the Support Spacing and Support Interface Layers fields automatically collapse. Settings are saved per-model and persist across app restarts.
+
+**Sticky model title bar**
+When scrolling down a model detail page, a compact title bar slides in just below the navigation bar showing the model name and a quick-access favorite button. It disappears when you scroll back to the top, so it never obscures the full header.
+
+**Model title above image**
+The model name and collection label have been moved above the image carousel so the model is immediately identifiable before scrolling.
+
+**"Newest on Drive" sort option**
+A new sort option has been added to the library toolbar that orders models by the date their folder was originally created on the local filesystem (falling back to scan date for older entries).
+
+**Persistent sort preference**
+The selected sort order is now saved to `localStorage` and restored automatically when navigating back from a model detail page or reopening the app.
+
+### Version
+
+All in-app version references updated from v1.0/v1.1 to **v1.2.0-beta**.
+
+---
+
 ## [v1.1.0-beta] — 2026-07-09
 
 ### New Features

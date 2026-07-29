@@ -4,7 +4,7 @@
 No installation required. Runs on any Windows 10/11 PC straight from a folder or USB drive.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0--Beta-blue.svg)](https://github.com/kenny-print-it/my3dlibrary/releases)
+[![Version](https://img.shields.io/badge/version-1.2--Beta-blue.svg)](https://github.com/kenny-print-it/my3dlibrary/releases)
 [![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/kennyprintit)
 
 ---
@@ -40,7 +40,7 @@ Just unzip and double-click `My3DLibrary.exe`. That's it.
 
 ## Quick Start
 
-1. Download and unzip `My3DLibrary-Portable-v1.0-Beta.zip`
+1. Download and unzip `My3DLibrary-Portable-v1.2-Beta.zip`
 2. Double-click `My3DLibrary.exe`
 3. Your browser opens automatically at `http://localhost:3000`
 4. Go to **Settings → Library**, click **Add Folder**, and point it at your models folder

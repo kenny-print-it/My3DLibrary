@@ -1,6 +1,6 @@
 /**
  * package-win.mjs
- * Builds My3DLibrary-Windows-v1.1-Beta.zip using the system zip command.
+ * Builds My3DLibrary-Windows-v1.3-Beta.zip using the system zip command.
  * Uses new dist/ (freshly built) + existing runtime/node.exe, node_modules, launcher files.
  */
 import { execSync } from "child_process";
@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, rmSync, cpSync } from "fs";
 const PORTABLE = "/home/ubuntu/printlib-portable";
 const WIN_EXTRAS = "/tmp/win-extras";
 const STAGING = "/tmp/win-staging";
-const OUT = "/home/ubuntu/My3DLibrary-Windows-v1.1-Beta.zip";
+const OUT = "/home/ubuntu/My3DLibrary-Windows-v1.3-Beta.zip";
 
 console.log("📦 Packaging Windows ZIP...");
 
