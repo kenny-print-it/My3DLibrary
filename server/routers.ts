@@ -458,12 +458,14 @@ export const appRouter = router({
         const scanned = await _scan(collectionPath);
         const scannedModel = scanned.flatMap((c) => c.models).find((m) => m.name === model.name);
 
+        const rescanModelRoot = model.rootPath || libraryPath;
         const images = (scannedModel?.images ?? []).map((f) => ({
           fileId: f.relativePath,
           name: f.name,
           thumbnailLink: `/local-files/${f.relativePath}`,
           webContentLink: `/local-files/${f.relativePath}`,
           mimeType: f.mimeType,
+          absPath: rescanModelRoot ? require("path").join(rescanModelRoot, f.relativePath) : "",
         }));
         const modelFiles = (scannedModel?.files ?? []).filter((f) => !f.isImage).map((f) => ({
           fileId: f.relativePath,
@@ -471,6 +473,7 @@ export const appRouter = router({
           size: String(f.size),
           mimeType: f.mimeType,
           webContentLink: `/local-files/${f.relativePath}`,
+          absPath: rescanModelRoot ? require("path").join(rescanModelRoot, f.relativePath) : "",
         }));
         const thumbnailUrl = scannedModel?.thumbnailPath
           ? `/local-files/${scannedModel.thumbnailPath}`

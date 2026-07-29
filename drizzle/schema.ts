@@ -166,4 +166,5 @@ export interface DriveFile {
   mimeType: string;
   id?: string;
   webViewLink?: string;
+  absPath?: string; // absolute local filesystem path — used for disk rename
 }
