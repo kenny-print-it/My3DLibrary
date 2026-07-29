@@ -21,6 +21,8 @@ import {
   type Resource,
   libraryPaths,
   type LibraryPath,
+  trashedFiles,
+  type TrashedFile,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -466,8 +468,8 @@ export async function renameModelFile(
 }
 
 /**
- * Remove a file (image or model file) from a model's JSON array,
- * and also delete the actual file from disk if it exists.
+ * Soft-delete a file: move it to a .trash folder inside the library root,
+ * record the move in the trashed_files table, and remove it from the model's JSON array.
  */
 export async function deleteModelFile(
   modelId: number,
@@ -480,13 +482,35 @@ export async function deleteModelFile(
   const model = rows[0];
   if (!model) return;
   const rootPath = (model as any).rootPath as string | null;
+
+  const moveToTrash = (absFile: string, fileName: string) => {
+    if (!absFile || !fs.existsSync(absFile)) return null;
+    // Determine trash dir: sibling .trash folder next to the file's parent dir
+    const fileDir = path.dirname(absFile);
+    const trashDir = path.join(fileDir, ".trash");
+    try { fs.mkdirSync(trashDir, { recursive: true }); } catch {}
+    // Avoid collisions by prefixing with timestamp
+    const trashName = `${Date.now()}_${fileName}`;
+    const trashPath = path.join(trashDir, trashName);
+    try { fs.renameSync(absFile, trashPath); return trashPath; } catch { return null; }
+  };
+
   if (fileType === "image") {
     const imgs: any[] = JSON.parse((model.images as any) ?? "[]");
     const entry = imgs.find((img: any) => (img.fileId ?? img.id) === fileId);
-    if (entry && rootPath) {
+    if (entry) {
       const absFile = entry.absPath ?? (rootPath ? path.join(rootPath, fileId) : null);
-      if (absFile && fs.existsSync(absFile)) {
-        try { fs.unlinkSync(absFile); } catch {}
+      const trashPath = absFile ? moveToTrash(absFile, entry.name ?? path.basename(absFile)) : null;
+      if (trashPath) {
+        await db.insert(trashedFiles).values({
+          modelId,
+          modelName: model.name,
+          fileType: "image",
+          fileId,
+          originalName: entry.name ?? path.basename(absFile),
+          originalAbsPath: absFile,
+          trashAbsPath: trashPath,
+        });
       }
     }
     const updated = imgs.filter((img: any) => (img.fileId ?? img.id) !== fileId);
@@ -494,15 +518,94 @@ export async function deleteModelFile(
   } else {
     const files: any[] = JSON.parse((model.modelFiles as any) ?? "[]");
     const entry = files.find((f: any) => (f.fileId ?? f.id) === fileId);
-    if (entry && rootPath) {
+    if (entry) {
       const absFile = entry.absPath ?? (rootPath ? path.join(rootPath, fileId) : null);
-      if (absFile && fs.existsSync(absFile)) {
-        try { fs.unlinkSync(absFile); } catch {}
+      const trashPath = absFile ? moveToTrash(absFile, entry.name ?? path.basename(absFile)) : null;
+      if (trashPath) {
+        await db.insert(trashedFiles).values({
+          modelId,
+          modelName: model.name,
+          fileType: "model",
+          fileId,
+          originalName: entry.name ?? path.basename(absFile),
+          originalAbsPath: absFile,
+          trashAbsPath: trashPath,
+        });
       }
     }
     const updated = files.filter((f: any) => (f.fileId ?? f.id) !== fileId);
     await db.update(models).set({ modelFiles: JSON.stringify(updated) as any, fileCount: updated.length }).where(eq(models.id, modelId));
   }
+}
+
+export async function listTrashedFiles(): Promise<TrashedFile[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(trashedFiles).orderBy(desc(trashedFiles.deletedAt));
+}
+
+export async function restoreTrashedFile(id: number): Promise<{ success: boolean; message: string }> {
+  const db = await getDb();
+  if (!db) return { success: false, message: "DB not available" };
+  const rows = await db.select().from(trashedFiles).where(eq(trashedFiles.id, id)).limit(1);
+  const entry = rows[0];
+  if (!entry) return { success: false, message: "Trash entry not found" };
+  if (!fs.existsSync(entry.trashAbsPath)) return { success: false, message: "Trashed file no longer exists on disk" };
+  // Restore: move back to original path
+  const destDir = path.dirname(entry.originalAbsPath);
+  try { fs.mkdirSync(destDir, { recursive: true }); } catch {}
+  // If original path is taken, add suffix
+  let destPath = entry.originalAbsPath;
+  if (fs.existsSync(destPath)) {
+    const ext = path.extname(destPath);
+    const base = path.basename(destPath, ext);
+    destPath = path.join(destDir, `${base}_restored_${Date.now()}${ext}`);
+  }
+  try {
+    fs.renameSync(entry.trashAbsPath, destPath);
+  } catch (e: any) {
+    return { success: false, message: `Could not restore file: ${e.message}` };
+  }
+  // Re-add the file to the model's JSON array
+  const modelRows = await db.select().from(models).where(eq(models.id, entry.modelId)).limit(1);
+  const model = modelRows[0];
+  if (model) {
+    if (entry.fileType === "image") {
+      const imgs: any[] = JSON.parse((model.images as any) ?? "[]");
+      imgs.push({ fileId: entry.fileId, name: entry.originalName, absPath: destPath, thumbnailLink: "", webContentLink: "", mimeType: "image/" + path.extname(destPath).slice(1) });
+      await db.update(models).set({ images: JSON.stringify(imgs) as any, imageCount: imgs.length }).where(eq(models.id, entry.modelId));
+    } else {
+      const files: any[] = JSON.parse((model.modelFiles as any) ?? "[]");
+      files.push({ fileId: entry.fileId, name: entry.originalName, absPath: destPath, size: "0", webContentLink: "", mimeType: "application/octet-stream" });
+      await db.update(models).set({ modelFiles: JSON.stringify(files) as any, fileCount: files.length }).where(eq(models.id, entry.modelId));
+    }
+  }
+  await db.delete(trashedFiles).where(eq(trashedFiles.id, id));
+  return { success: true, message: `Restored to ${destPath}` };
+}
+
+export async function purgeTrashedFile(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const rows = await db.select().from(trashedFiles).where(eq(trashedFiles.id, id)).limit(1);
+  const entry = rows[0];
+  if (!entry) return;
+  if (fs.existsSync(entry.trashAbsPath)) {
+    try { fs.unlinkSync(entry.trashAbsPath); } catch {}
+  }
+  await db.delete(trashedFiles).where(eq(trashedFiles.id, id));
+}
+
+export async function purgeAllTrashedFiles(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const all = await db.select().from(trashedFiles);
+  for (const entry of all) {
+    if (fs.existsSync(entry.trashAbsPath)) {
+      try { fs.unlinkSync(entry.trashAbsPath); } catch {}
+    }
+  }
+  await db.delete(trashedFiles);
 }
 
 export async function bulkTagModels(
@@ -849,6 +952,7 @@ CREATE TABLE IF NOT EXISTS \`tags\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMEN
 CREATE UNIQUE INDEX IF NOT EXISTS \`tags_name_unique\` ON \`tags\` (\`name\`);
 CREATE TABLE IF NOT EXISTS \`users\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`name\` text,\n\t\`username\` text,\n\t\`passwordHash\` text,\n\t\`openId\` text,\n\t\`email\` text,\n\t\`role\` text DEFAULT 'user' NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`lastSignedIn\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
 CREATE UNIQUE INDEX IF NOT EXISTS \`users_username_unique\` ON \`users\` (\`username\`);
+CREATE TABLE IF NOT EXISTS \`trashed_files\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`model_id\` integer NOT NULL,\n\t\`model_name\` text NOT NULL,\n\t\`file_type\` text NOT NULL,\n\t\`file_id\` text NOT NULL,\n\t\`original_name\` text NOT NULL,\n\t\`original_abs_path\` text NOT NULL,\n\t\`trash_abs_path\` text NOT NULL,\n\t\`deleted_at\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
 `;
 
 // ─── Auto-init: apply embedded migration SQL if DB is empty ──────────────────
@@ -876,6 +980,20 @@ export async function initDbIfNeeded(): Promise<void> {
     sqlite.exec("ALTER TABLE models ADD COLUMN sourceUrl text;");
     console.log("[DB Migrate] Added sourceUrl column to models.");
   } catch { /* column already exists — ignore */ }
+  try {
+    sqlite.exec(`CREATE TABLE IF NOT EXISTS trashed_files (
+      id integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      model_id integer NOT NULL,
+      model_name text NOT NULL,
+      file_type text NOT NULL,
+      file_id text NOT NULL,
+      original_name text NOT NULL,
+      original_abs_path text NOT NULL,
+      trash_abs_path text NOT NULL,
+      deleted_at integer DEFAULT (unixepoch('now') * 1000) NOT NULL
+    );`);
+    console.log("[DB Migrate] Created trashed_files table.");
+  } catch { /* already exists — ignore */ }
   if (tables.n === 0) {
     // Apply embedded migration SQL (no file system dependency)
     const stmts = MIGRATION_SQL.split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0);
