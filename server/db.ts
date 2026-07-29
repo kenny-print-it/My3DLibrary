@@ -23,6 +23,8 @@ import {
   type LibraryPath,
   trashedFiles,
   type TrashedFile,
+  trashedModels,
+  type TrashedModel,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -608,6 +610,116 @@ export async function purgeAllTrashedFiles(): Promise<void> {
   await db.delete(trashedFiles);
 }
 
+/**
+ * Soft-delete an entire model: move its folder to a .trash directory,
+ * record the move in trashed_models, and remove the model from the DB.
+ */
+export async function deleteModel(modelId: number): Promise<{ success: boolean; message: string }> {
+  const db = await getDb();
+  if (!db) return { success: false, message: "DB not available" };
+  const rows = await db.select().from(models).where(eq(models.id, modelId)).limit(1);
+  const model = rows[0];
+  if (!model) return { success: false, message: "Model not found" };
+
+  const folderPath = (model as any).rootPath as string | null;
+  if (!folderPath || !fs.existsSync(folderPath)) {
+    // No folder on disk — just remove from DB
+    await db.delete(modelTags).where(eq(modelTags.modelId, modelId));
+    await db.delete(models).where(eq(models.id, modelId));
+    return { success: true, message: "Model removed from library (no folder found on disk)" };
+  }
+
+  // Move folder to .trash sibling directory
+  const parentDir = path.dirname(folderPath);
+  const trashDir = path.join(parentDir, ".trash");
+  try { fs.mkdirSync(trashDir, { recursive: true }); } catch {}
+  const folderName = path.basename(folderPath);
+  const trashFolderPath = path.join(trashDir, `${Date.now()}_${folderName}`);
+  try {
+    fs.renameSync(folderPath, trashFolderPath);
+  } catch (e: any) {
+    return { success: false, message: `Could not move folder to trash: ${e.message}` };
+  }
+
+  // Get category name for display
+  let categoryName: string | null = null;
+  if (model.categoryId) {
+    const catRows = await db.select().from(categories).where(eq(categories.id, model.categoryId)).limit(1);
+    categoryName = catRows[0]?.name ?? null;
+  }
+
+  // Record in trashed_models
+  await db.insert(trashedModels).values({
+    modelId,
+    modelName: model.name,
+    originalFolderPath: folderPath,
+    trashFolderPath,
+    categoryId: model.categoryId ?? null,
+    categoryName,
+    fileCount: model.fileCount ?? 0,
+    imageCount: model.imageCount ?? 0,
+  });
+
+  // Remove from DB
+  await db.delete(modelTags).where(eq(modelTags.modelId, modelId));
+  await db.delete(models).where(eq(models.id, modelId));
+
+  return { success: true, message: `Model "${model.name}" moved to trash` };
+}
+
+export async function listTrashedModels(): Promise<TrashedModel[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(trashedModels).orderBy(desc(trashedModels.deletedAt));
+}
+
+export async function restoreTrashedModel(id: number): Promise<{ success: boolean; message: string }> {
+  const db = await getDb();
+  if (!db) return { success: false, message: "DB not available" };
+  const rows = await db.select().from(trashedModels).where(eq(trashedModels.id, id)).limit(1);
+  const entry = rows[0];
+  if (!entry) return { success: false, message: "Trash entry not found" };
+  if (!fs.existsSync(entry.trashFolderPath)) return { success: false, message: "Trashed folder no longer exists on disk" };
+
+  // Restore: move back to original path
+  let destPath = entry.originalFolderPath;
+  if (fs.existsSync(destPath)) {
+    destPath = destPath + `_restored_${Date.now()}`;
+  }
+  try {
+    fs.renameSync(entry.trashFolderPath, destPath);
+  } catch (e: any) {
+    return { success: false, message: `Could not restore folder: ${e.message}` };
+  }
+
+  await db.delete(trashedModels).where(eq(trashedModels.id, id));
+  return { success: true, message: `Folder restored to ${destPath}. Run a library scan to re-import the model.` };
+}
+
+export async function purgeTrashedModel(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const rows = await db.select().from(trashedModels).where(eq(trashedModels.id, id)).limit(1);
+  const entry = rows[0];
+  if (!entry) return;
+  if (fs.existsSync(entry.trashFolderPath)) {
+    try { fs.rmSync(entry.trashFolderPath, { recursive: true, force: true }); } catch {}
+  }
+  await db.delete(trashedModels).where(eq(trashedModels.id, id));
+}
+
+export async function purgeAllTrashedModels(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const all = await db.select().from(trashedModels);
+  for (const entry of all) {
+    if (fs.existsSync(entry.trashFolderPath)) {
+      try { fs.rmSync(entry.trashFolderPath, { recursive: true, force: true }); } catch {}
+    }
+  }
+  await db.delete(trashedModels);
+}
+
 export async function bulkTagModels(
   modelIds: number[],
   addTagIds: number[],
@@ -953,6 +1065,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS \`tags_name_unique\` ON \`tags\` (\`name\`);
 CREATE TABLE IF NOT EXISTS \`users\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`name\` text,\n\t\`username\` text,\n\t\`passwordHash\` text,\n\t\`openId\` text,\n\t\`email\` text,\n\t\`role\` text DEFAULT 'user' NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`lastSignedIn\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
 CREATE UNIQUE INDEX IF NOT EXISTS \`users_username_unique\` ON \`users\` (\`username\`);
 CREATE TABLE IF NOT EXISTS \`trashed_files\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`model_id\` integer NOT NULL,\n\t\`model_name\` text NOT NULL,\n\t\`file_type\` text NOT NULL,\n\t\`file_id\` text NOT NULL,\n\t\`original_name\` text NOT NULL,\n\t\`original_abs_path\` text NOT NULL,\n\t\`trash_abs_path\` text NOT NULL,\n\t\`deleted_at\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE TABLE IF NOT EXISTS \`trashed_models\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`model_id\` integer NOT NULL,\n\t\`model_name\` text NOT NULL,\n\t\`original_folder_path\` text NOT NULL,\n\t\`trash_folder_path\` text NOT NULL,\n\t\`category_id\` integer,\n\t\`category_name\` text,\n\t\`file_count\` integer DEFAULT 0 NOT NULL,\n\t\`image_count\` integer DEFAULT 0 NOT NULL,\n\t\`deleted_at\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
 `;
 
 // ─── Auto-init: apply embedded migration SQL if DB is empty ──────────────────
@@ -980,6 +1093,21 @@ export async function initDbIfNeeded(): Promise<void> {
     sqlite.exec("ALTER TABLE models ADD COLUMN sourceUrl text;");
     console.log("[DB Migrate] Added sourceUrl column to models.");
   } catch { /* column already exists — ignore */ }
+  try {
+    sqlite.exec(`CREATE TABLE IF NOT EXISTS trashed_models (
+      id integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      model_id integer NOT NULL,
+      model_name text NOT NULL,
+      original_folder_path text NOT NULL,
+      trash_folder_path text NOT NULL,
+      category_id integer,
+      category_name text,
+      file_count integer DEFAULT 0 NOT NULL,
+      image_count integer DEFAULT 0 NOT NULL,
+      deleted_at integer DEFAULT (unixepoch('now') * 1000) NOT NULL
+    );`);
+    console.log("[DB Migrate] Created trashed_models table.");
+  } catch { /* already exists — ignore */ }
   try {
     sqlite.exec(`CREATE TABLE IF NOT EXISTS trashed_files (
       id integer PRIMARY KEY AUTOINCREMENT NOT NULL,

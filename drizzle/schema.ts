@@ -161,6 +161,22 @@ export const trashedFiles = sqliteTable("trashed_files", {
 export type TrashedFile = typeof trashedFiles.$inferSelect;
 export type InsertTrashedFile = typeof trashedFiles.$inferInsert;
 
+// ─── Trash (soft-deleted models) ───────────────────────────────────────────
+export const trashedModels = sqliteTable("trashed_models", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  modelId: integer("model_id").notNull(),
+  modelName: text("model_name").notNull(),
+  originalFolderPath: text("original_folder_path").notNull(),
+  trashFolderPath: text("trash_folder_path").notNull(),
+  categoryId: integer("category_id"),
+  categoryName: text("category_name"),
+  fileCount: integer("file_count").default(0).notNull(),
+  imageCount: integer("image_count").default(0).notNull(),
+  deletedAt: integer("deleted_at", { mode: "timestamp_ms" }).default(now).notNull(),
+});
+export type TrashedModel = typeof trashedModels.$inferSelect;
+export type InsertTrashedModel = typeof trashedModels.$inferInsert;
+
 // ─── Shared file types ────────────────────────────────────────────────────────
 export interface DriveImage {
   fileId: string;

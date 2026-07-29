@@ -689,6 +689,37 @@ export const appRouter = router({
       await db.purgeAllTrashedFiles();
       return { success: true };
     }),
+
+    // ── Model-level trash ──────────────────────────────────────────────────
+    deleteModel: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const result = await db.deleteModel(input.id);
+        if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.message });
+        return result;
+      }),
+
+    listModels: adminProcedure.query(async () => db.listTrashedModels()),
+
+    restoreModel: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const result = await db.restoreTrashedModel(input.id);
+        if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.message });
+        return result;
+      }),
+
+    purgeModel: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.purgeTrashedModel(input.id);
+        return { success: true };
+      }),
+
+    purgeAllModels: adminProcedure.mutation(async () => {
+      await db.purgeAllTrashedModels();
+      return { success: true };
+    }),
   }),
 });
 export type AppRouter = typeof appRouter;

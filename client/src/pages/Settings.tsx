@@ -942,66 +942,137 @@ export default function Settings() {
 // ── Trash Tab Component ─────────────────────────────────────────────────────────────────────────────────────
 function TrashTab() {
   const utils = trpc.useUtils();
-  const { data: trashItems = [], isLoading } = trpc.trash.list.useQuery();
+  const { data: trashFiles = [], isLoading: loadingFiles } = trpc.trash.list.useQuery();
+  const { data: trashModelItems = [], isLoading: loadingModels } = trpc.trash.listModels.useQuery();
   const [confirmPurgeAll, setConfirmPurgeAll] = React.useState(false);
 
-  const restoreMutation = trpc.trash.restore.useMutation({
-    onSuccess: (res) => {
-      toast.success(`Restored: ${res.message}`);
-      utils.trash.list.invalidate();
-    },
+  const totalCount = trashFiles.length + trashModelItems.length;
+  const isLoading = loadingFiles || loadingModels;
+
+  // File-level mutations
+  const restoreFileMutation = trpc.trash.restore.useMutation({
+    onSuccess: (res) => { toast.success(`Restored: ${res.message}`); utils.trash.list.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
-
-  const purgeMutation = trpc.trash.purge.useMutation({
-    onSuccess: () => {
-      toast.success("File permanently deleted");
-      utils.trash.list.invalidate();
-    },
+  const purgeFileMutation = trpc.trash.purge.useMutation({
+    onSuccess: () => { toast.success("File permanently deleted"); utils.trash.list.invalidate(); },
     onError: () => toast.error("Failed to permanently delete file"),
   });
-
-  const purgeAllMutation = trpc.trash.purgeAll.useMutation({
-    onSuccess: () => {
-      toast.success("Trash emptied");
-      utils.trash.list.invalidate();
-      setConfirmPurgeAll(false);
-    },
-    onError: () => toast.error("Failed to empty trash"),
+  const purgeAllFilesMutation = trpc.trash.purgeAll.useMutation({
+    onSuccess: () => { utils.trash.list.invalidate(); },
+    onError: () => toast.error("Failed to empty file trash"),
   });
+
+  // Model-level mutations
+  const restoreModelMutation = trpc.trash.restoreModel.useMutation({
+    onSuccess: (res) => { toast.success(res.message); utils.trash.listModels.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const purgeModelMutation = trpc.trash.purgeModel.useMutation({
+    onSuccess: () => { toast.success("Model permanently deleted"); utils.trash.listModels.invalidate(); },
+    onError: () => toast.error("Failed to permanently delete model"),
+  });
+  const purgeAllModelsMutation = trpc.trash.purgeAllModels.useMutation({
+    onSuccess: () => { utils.trash.listModels.invalidate(); },
+    onError: () => toast.error("Failed to empty model trash"),
+  });
+
+  const handleEmptyAll = async () => {
+    await Promise.all([
+      purgeAllFilesMutation.mutateAsync(),
+      purgeAllModelsMutation.mutateAsync(),
+    ]);
+    toast.success("Trash emptied");
+    setConfirmPurgeAll(false);
+  };
 
   const formatDate = (ts: Date | number) => new Date(ts).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="space-y-6">
+      {/* ── Trashed Models ── */}
       <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
           <div>
-            <h2 className="font-semibold text-foreground">Recycle Bin</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">Files moved here can be restored or permanently deleted</p>
+            <h2 className="font-semibold text-foreground">Deleted Models</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Entire model folders moved to trash — restore to re-import on next scan</p>
           </div>
-          {trashItems.length > 0 && (
+        </div>
+        {isLoading ? (
+          <div className="px-5 py-8 text-center text-muted-foreground text-sm">Loading...</div>
+        ) : trashModelItems.length === 0 ? (
+          <div className="px-5 py-8 flex flex-col items-center gap-2 text-muted-foreground">
+            <FolderOpen className="w-7 h-7 opacity-25" />
+            <p className="text-sm">No deleted models</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/50">
+            {trashModelItems.map((item) => (
+              <div key={item.id} className="flex items-start gap-3 px-5 py-3.5 hover:bg-muted/20 transition-colors">
+                <div className="mt-0.5 p-1.5 rounded-md bg-muted/50">
+                  <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{item.modelName}</p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {item.categoryName && <><span className="text-foreground/70">{item.categoryName}</span><span className="mx-1.5 opacity-40">·</span></>}
+                    {item.fileCount} file{item.fileCount !== 1 ? "s" : ""}, {item.imageCount} image{item.imageCount !== 1 ? "s" : ""}
+                    <span className="mx-1.5 opacity-40">·</span>
+                    Deleted {formatDate(item.deletedAt)}
+                  </p>
+                  <p className="text-xs text-muted-foreground/50 truncate mt-0.5" title={item.originalFolderPath}>{item.originalFolderPath}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => restoreModelMutation.mutate({ id: item.id })}
+                    disabled={restoreModelMutation.isPending}
+                    className="px-2.5 py-1 text-xs rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+                    title="Restore folder to original location (then run a library scan to re-import)"
+                  >
+                    Restore
+                  </button>
+                  <button
+                    onClick={() => purgeModelMutation.mutate({ id: item.id })}
+                    disabled={purgeModelMutation.isPending}
+                    className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors disabled:opacity-50"
+                    title="Permanently delete folder from disk"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Trashed Files ── */}
+      <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+          <div>
+            <h2 className="font-semibold text-foreground">Deleted Files</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Individual files removed from models</p>
+          </div>
+          {totalCount > 0 && (
             <button
               onClick={() => setConfirmPurgeAll(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Empty Trash
+              Empty All Trash
             </button>
           )}
         </div>
-
         {isLoading ? (
           <div className="px-5 py-8 text-center text-muted-foreground text-sm">Loading...</div>
-        ) : trashItems.length === 0 ? (
-          <div className="px-5 py-10 flex flex-col items-center gap-2 text-muted-foreground">
-            <Trash2 className="w-8 h-8 opacity-30" />
-            <p className="text-sm">Trash is empty</p>
-            <p className="text-xs opacity-60">Deleted files will appear here and can be restored</p>
+        ) : trashFiles.length === 0 ? (
+          <div className="px-5 py-8 flex flex-col items-center gap-2 text-muted-foreground">
+            <Trash2 className="w-7 h-7 opacity-25" />
+            <p className="text-sm">No deleted files</p>
           </div>
         ) : (
           <div className="divide-y divide-border/50">
-            {trashItems.map((item) => (
+            {trashFiles.map((item) => (
               <div key={item.id} className="flex items-start gap-3 px-5 py-3.5 hover:bg-muted/20 transition-colors">
                 <div className="mt-0.5 p-1.5 rounded-md bg-muted/50">
                   <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1019,16 +1090,16 @@ function TrashTab() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
-                    onClick={() => restoreMutation.mutate({ id: item.id })}
-                    disabled={restoreMutation.isPending}
+                    onClick={() => restoreFileMutation.mutate({ id: item.id })}
+                    disabled={restoreFileMutation.isPending}
                     className="px-2.5 py-1 text-xs rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
                     title="Restore file to original location"
                   >
                     Restore
                   </button>
                   <button
-                    onClick={() => purgeMutation.mutate({ id: item.id })}
-                    disabled={purgeMutation.isPending}
+                    onClick={() => purgeFileMutation.mutate({ id: item.id })}
+                    disabled={purgeFileMutation.isPending}
                     className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors disabled:opacity-50"
                     title="Permanently delete"
                   >
@@ -1041,25 +1112,25 @@ function TrashTab() {
         )}
       </section>
 
-      {/* Confirm empty trash dialog */}
+      {/* Confirm empty all trash dialog */}
       {confirmPurgeAll && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setConfirmPurgeAll(false)}>
           <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start gap-3 mb-4">
               <div className="p-2 rounded-lg bg-red-500/10 shrink-0"><Trash2 className="w-5 h-5 text-red-400" /></div>
               <div>
-                <h3 className="font-semibold text-foreground">Empty Trash?</h3>
-                <p className="text-sm text-muted-foreground mt-1">This permanently deletes all {trashItems.length} file{trashItems.length !== 1 ? "s" : ""} in the trash. This cannot be undone.</p>
+                <h3 className="font-semibold text-foreground">Empty All Trash?</h3>
+                <p className="text-sm text-muted-foreground mt-1">This permanently deletes all {totalCount} item{totalCount !== 1 ? "s" : ""} in the trash. This cannot be undone.</p>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setConfirmPurgeAll(false)} className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-accent transition-colors">Cancel</button>
               <button
-                onClick={() => purgeAllMutation.mutate()}
-                disabled={purgeAllMutation.isPending}
+                onClick={handleEmptyAll}
+                disabled={purgeAllFilesMutation.isPending || purgeAllModelsMutation.isPending}
                 className="px-3 py-1.5 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
               >
-                {purgeAllMutation.isPending ? "Deleting..." : "Empty Trash"}
+                {(purgeAllFilesMutation.isPending || purgeAllModelsMutation.isPending) ? "Deleting..." : "Empty Trash"}
               </button>
             </div>
           </div>

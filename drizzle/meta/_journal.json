@@ -15,6 +15,13 @@
       "when": 1785341265488,
       "tag": "0001_cloudy_zzzax",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785341581663,
+      "tag": "0002_sharp_mysterio",
+      "breakpoints": true
     }
   ]
 }
