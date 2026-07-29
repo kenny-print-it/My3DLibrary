@@ -542,6 +542,41 @@ export const appRouter = router({
         await db.deleteModelFile(input.modelId, input.fileType, input.fileId);
         return { success: true };
       }),
+
+    openFolder: protectedProcedure
+      .input(z.object({ folderPath: z.string() }))
+      .mutation(async ({ input }) => {
+        const { spawn } = require("child_process");
+        const { folderPath } = input;
+        if (!folderPath) throw new TRPCError({ code: "BAD_REQUEST", message: "No folder path provided" });
+        const platform = process.platform;
+        if (platform === "win32") {
+          spawn("explorer", [folderPath], { detached: true, stdio: "ignore" }).unref();
+        } else if (platform === "darwin") {
+          spawn("open", [folderPath], { detached: true, stdio: "ignore" }).unref();
+        } else {
+          spawn("xdg-open", [folderPath], { detached: true, stdio: "ignore" }).unref();
+        }
+        return { success: true };
+      }),
+
+    openFile: protectedProcedure
+      .input(z.object({ filePath: z.string() }))
+      .mutation(async ({ input }) => {
+        const { spawn } = require("child_process");
+        const { filePath } = input;
+        if (!filePath) throw new TRPCError({ code: "BAD_REQUEST", message: "No file path provided" });
+        const platform = process.platform;
+        if (platform === "win32") {
+          // On Windows, use 'start' via cmd to open with default app
+          spawn("cmd", ["/c", "start", "", filePath], { detached: true, stdio: "ignore" }).unref();
+        } else if (platform === "darwin") {
+          spawn("open", [filePath], { detached: true, stdio: "ignore" }).unref();
+        } else {
+          spawn("xdg-open", [filePath], { detached: true, stdio: "ignore" }).unref();
+        }
+        return { success: true };
+      }),
   }),
 
   tags: router({

@@ -203,6 +203,20 @@ export default function ModelDetail() {
     onError: () => toast.error("Failed to delete file"),
   });
 
+  const openFolderMutation = trpc.models.openFolder.useMutation({
+    onError: () => toast.error("Could not open folder"),
+  });
+
+  const handleOpenFolder = () => {
+    const folderPath = (model as any)?.localFolderPath;
+    if (folderPath) openFolderMutation.mutate({ folderPath });
+    else toast.error("Folder path not available");
+  };
+
+  const openFileMutation = trpc.models.openFile.useMutation({
+    onError: () => toast.error("Could not open file"),
+  });
+
   const deleteModelMutation = trpc.trash.deleteModel.useMutation({
     onSuccess: (res) => {
       utils.models.list.invalidate();
@@ -701,9 +715,16 @@ export default function ModelDetail() {
                                 </button>
                               </>
                             )}
-                            <a href={file.webViewLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="View in Drive">
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
+{(file as any).absPath && (
+                              <button
+                                type="button"
+                                onClick={() => openFileMutation.mutate({ filePath: (file as any).absPath })}
+                                className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                title="Open with default app (slicer)"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             {file.webContentLink && (
                               <a href={file.webContentLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Download">
                                 <Download className="w-3.5 h-3.5" />
@@ -983,16 +1004,16 @@ export default function ModelDetail() {
             )}
           </div>
 
-          {/* View in Drive */}
-          <a
-            href={`https://drive.google.com/drive/folders/${model.driveId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+          {/* Open local folder */}
+          <button
+            type="button"
+            onClick={handleOpenFolder}
+            disabled={openFolderMutation.isPending}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-50"
           >
             <ExternalLink className="w-4 h-4" />
-            Open folder in Google Drive
-          </a>
+            Open folder in Explorer
+          </button>
         </div>
       </div>
 
