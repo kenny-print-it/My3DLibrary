@@ -26,6 +26,8 @@ cpSync(`${WIN_EXTRAS}/My3DLibrary.exe`, `${STAGING}/My3DLibrary.exe`);
 for (const f of ["Start.bat", "Stop.bat", "README.txt", "Download-AI-Model.bat", "kenny-logo.ico"]) {
   cpSync(`${WIN_EXTRAS}/My3DLibrary-Portable/${f}`, `${STAGING}/My3DLibrary-Portable/${f}`);
 }
+// 2b. Silent VBScript launcher (new — hides terminal windows)
+cpSync(`${WIN_EXTRAS}/My3DLibrary-Portable/Start.vbs`, `${STAGING}/My3DLibrary-Portable/Start.vbs`);
 
 // 3. Runtime (node.exe)
 cpSync(`${WIN_EXTRAS}/My3DLibrary-Portable/runtime`, `${STAGING}/My3DLibrary-Portable/runtime`, { recursive: true });
