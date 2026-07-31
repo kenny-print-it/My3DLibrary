@@ -59,6 +59,42 @@ async function startServer() {
     if (!process.env.LLM_VISION_MODEL && dbSettings["llm_vision_model"]) {
       ENV.llmVisionModel = dbSettings["llm_vision_model"];
     }
+
+    // Read ollama/model-config.txt written by Download-AI-Model.bat.
+    // If the DB still has blank or legacy default values (llava), override them
+    // with the models that were actually downloaded.
+    try {
+      const configPath = path.join(process.cwd(), "ollama", "model-config.txt");
+      if (fs.existsSync(configPath)) {
+        const cfg: Record<string, string> = {};
+        for (const line of fs.readFileSync(configPath, "utf-8").split("\n")) {
+          const eq = line.indexOf("=");
+          if (eq > 0) cfg[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+        }
+        const { setSetting } = await import("../db");
+        // Override text model if blank or still the old default
+        const isDefaultText = !ENV.llmTextModel || ENV.llmTextModel === "llava" || ENV.llmTextModel === "llama3.2";
+        if (cfg.text && isDefaultText) {
+          ENV.llmTextModel = cfg.text;
+          await setSetting("llm_text_model", cfg.text);
+        }
+        // Override vision model if blank or still the old default
+        const isDefaultVision = !ENV.llmVisionModel || ENV.llmVisionModel === "llava";
+        if (cfg.vision && isDefaultVision) {
+          ENV.llmVisionModel = cfg.vision;
+          await setSetting("llm_vision_model", cfg.vision);
+        }
+        // Set API URL to localhost:11434 if not yet configured
+        if (!ENV.llmApiUrl && (cfg.text || cfg.vision)) {
+          ENV.llmApiUrl = "http://localhost:11434";
+          await setSetting("llm_api_url", "http://localhost:11434");
+        }
+        console.log(`[Startup] model-config.txt applied: text=${ENV.llmTextModel}, vision=${ENV.llmVisionModel}`);
+      }
+    } catch (e) {
+      console.warn("[Startup] Could not apply model-config.txt:", e);
+    }
+
     console.log("[Startup] LLM config:", ENV.llmApiUrl ? `URL=${ENV.llmApiUrl}, model=${ENV.llmModel}, text=${ENV.llmTextModel || "(same as model)"}, vision=${ENV.llmVisionModel || "(same as model)"}` : "not configured");
   } catch (e) {
     console.warn("[Startup] Could not load LLM settings from DB:", e);
