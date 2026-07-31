@@ -4,7 +4,7 @@ All notable changes to My3DLibrary are documented here.
 
 ---
 
-## [v1.2.0-beta] — 2026-07-29
+## [v1.2.0-beta] — 2026-07-31
 
 ### New Features
 

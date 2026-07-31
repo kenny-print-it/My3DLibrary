@@ -1,3 +1,4 @@
+// My3DLibrary v1.2 Beta — Vitest configuration
 import { defineConfig } from "vitest/config";
 import path from "path";
 
