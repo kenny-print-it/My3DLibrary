@@ -5,6 +5,7 @@ import {
   Zap, Image as ImageIcon,
   Lock, Pencil, Save, Key, Eye, EyeOff, ChevronRight,
   HelpCircle, X, ArrowLeft, Folder, ToggleLeft, ToggleRight,
+  CheckCircle2, AlertCircle, Loader2, Square,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -35,7 +36,10 @@ function FolderBrowserDialog({
 
   const handleNavigate = (path: string) => setBrowsePath(path);
   const handleUp = () => {
-    if (browseData?.parent != null) setBrowsePath(browseData.parent);
+    if (browseData?.parent != null) {
+      // Empty string means "go back to drive list" on Windows
+      setBrowsePath(browseData.parent === "" ? undefined : browseData.parent);
+    }
   };
   const handleSelect = () => {
     if (browseData?.current) {
@@ -154,13 +158,13 @@ function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => v
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 text-sm">
 
           {/* What AI does */}
-          <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3">
-            <p className="text-foreground font-medium mb-1">What does AI do in My3DLibrary?</p>
+          <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-4 py-3">
+            <p className="text-foreground font-medium mb-1">🤖 What does AI do in My3DLibrary?</p>
             <ul className="text-muted-foreground space-y-1 list-disc list-inside text-xs">
-              <li><strong>Auto-tagging</strong> — looks at your model images and suggests tags like "fantasy", "vehicle", "miniature"</li>
-              <li><strong>Thumbnail selection</strong> — picks the best render image as the hero image for each model</li>
+              <li><strong>Auto-tagging</strong> — reads your model names and file lists, then automatically applies matching tags (e.g. "fantasy", "vehicle", "miniature")</li>
+              <li><strong>Thumbnail selection</strong> — picks the best render image as the cover photo for each model</li>
             </ul>
-            <p className="text-muted-foreground text-xs mt-2">AI is completely optional. Your library works fine without it.</p>
+            <p className="text-muted-foreground text-xs mt-2">✅ AI is completely optional — your library works perfectly without it.</p>
           </div>
 
           {/* Option A: Ollama */}
@@ -170,33 +174,44 @@ function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => v
               Ollama (Free, runs on your PC)
             </h3>
             <div className="space-y-2.5 text-muted-foreground text-xs">
-              <p>Ollama runs AI models locally — no internet, no subscription required. You need a reasonably modern PC (8GB+ RAM recommended).</p>
+                            <p>Ollama runs AI models directly on your computer — <strong className="text-foreground">no internet connection, no account, and no monthly fee required.</strong> You need a PC with at least 8 GB of RAM.</p>
+
+              <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-3 py-2.5 space-y-2">
+                <p className="font-medium text-green-400">⚡ Easiest way — use the included batch file</p>
+                <p>In your <span className="font-mono">My3DLibrary-Portable</span> folder, double-click <strong className="text-foreground">Download-AI-Model.bat</strong>. It will download and install everything automatically. Then skip to Step 3.</p>
+              </div>
+
+              <p className="font-medium text-foreground/70">— or set it up manually —</p>
 
               <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
-                <p className="font-medium text-foreground">Step 1 — Place ollama.exe in the app folder</p>
-                <p>Download <strong>ollama.exe</strong> from <span className="font-mono text-primary">ollama.com/download</span> and place it inside the <span className="font-mono">ollama\</span> folder next to <span className="font-mono">My3DLibrary.exe</span>.</p>
-                <p className="text-amber-400/90">⚠ The app looks for <span className="font-mono">ollama\ollama.exe</span> — it must be in that subfolder, not the root.</p>
+                <p className="font-medium text-foreground">Step 1 — Download and install Ollama</p>
+                <p>Go to <span className="font-mono text-primary">ollama.com/download</span> in your browser and download the Windows version. You'll get a file called <span className="font-mono">OllamaSetup.exe</span>. Run it to install Ollama like any normal program.</p>
               </div>
 
               <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
-                <p className="font-medium text-foreground">Step 2 — Pull a vision model</p>
-                <p>Open a Command Prompt, navigate to the <span className="font-mono">ollama\</span> folder, and run:</p>
-                <code className="block bg-black/40 rounded px-2 py-1.5 font-mono text-green-400 text-[11px]">ollama.exe pull llama3.2-vision</code>
-                <p>This downloads the model (~7 GB). You only need to do this once.</p>
+                <p className="font-medium text-foreground">Step 2 — Download the AI model</p>
+                <p>Open the <strong className="text-foreground">Start menu</strong>, search for <strong className="text-foreground">Command Prompt</strong>, and open it. Then type the command below and press <strong className="text-foreground">Enter</strong>:</p>
+                <code className="block bg-black/40 rounded px-2 py-1.5 font-mono text-green-400 text-[11px]">ollama pull llama3.2-vision</code>
+                <p>This downloads the AI model (about 7 GB). It may take 10–30 minutes. <strong className="text-foreground">You only need to do this once.</strong></p>
               </div>
 
               <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
                 <p className="font-medium text-foreground">Step 3 — Restart My3DLibrary</p>
-                <p>Close and reopen the app. Ollama starts automatically in the background.</p>
+                <p>Close the app completely and reopen it using <span className="font-mono">My3DLibrary.exe</span>. Ollama will start automatically in the background — you don't need to do anything else.</p>
               </div>
 
               <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
-                <p className="font-medium text-foreground">Step 4 — Enter these settings below</p>
-                <div className="space-y-1">
-                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:11434</span></p>
-                  <p><span className="font-medium text-foreground">API Key:</span> leave blank</p>
-                  <p><span className="font-medium text-foreground">Model:</span> <span className="font-mono">llama3.2-vision</span></p>
+                <p className="font-medium text-foreground">Step 4 — Enter these settings (click Edit above to unlock)</p>
+                <div className="space-y-1.5">
+                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:11434</span> <span className="text-muted-foreground italic">(copy this exactly)</span></p>
+                  <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">leave this blank</span></p>
+                  <p><span className="font-medium text-foreground">Model:</span> <span className="font-mono">llama3.2-vision</span> <span className="text-muted-foreground italic">(copy this exactly)</span></p>
                 </div>
+              </div>
+
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-2.5">
+                <p className="font-medium text-blue-400">✅ How to check it's working</p>
+                <p className="mt-1">After saving your settings, scroll down to the <strong className="text-foreground">AI Status</strong> section on this page. If it shows a green checkmark next to the model name, AI is ready to use. Then click <strong className="text-foreground">Re-tag All</strong> to automatically tag your models.</p>
               </div>
             </div>
           </div>
@@ -271,9 +286,15 @@ export default function Settings() {
   const [llmApiUrl, setLlmApiUrl] = useState("");
   const [llmApiKey, setLlmApiKey] = useState("");
   const [llmModel, setLlmModel] = useState("");
+  const [llmTextModel, setLlmTextModel] = useState("");
+  const [llmVisionModel, setLlmVisionModel] = useState("");
   const [showLlmKey, setShowLlmKey] = useState(false);
   const [isLlmEditing, setIsLlmEditing] = useState(false);
   const [showAIGuide, setShowAIGuide] = useState(false);
+  // AI status — poll every 10s so it refreshes after settings save
+  const { data: llmStatus, isLoading: llmStatusLoading, refetch: refetchLlmStatus } = trpc.settings.llmStatus.useQuery(undefined, {
+    refetchInterval: 10000,
+  });
 
   // Tags
   const { data: allTags = [] } = trpc.tags.list.useQuery();
@@ -296,6 +317,12 @@ export default function Settings() {
       setLlmApiUrl((settings as any).llm_api_url || "");
       setLlmApiKey((settings as any).llm_api_key || "");
       setLlmModel((settings as any).llm_model || "");
+      // Pre-populate with recommended defaults when fields are blank so new users
+      // get the correct models without having to know the names.
+      const recText = (settings as any).recommended_text_model || "llama3.2";
+      const recVision = (settings as any).recommended_vision_model || "llava";
+      setLlmTextModel((settings as any).llm_text_model || (settings as any).llm_model || recText);
+      setLlmVisionModel((settings as any).llm_vision_model || (settings as any).llm_model || recVision);
     }
   }, [settings]);
 
@@ -376,10 +403,36 @@ export default function Settings() {
   const reTagAll = trpc.tags.reTagAll.useMutation({
     onMutate: () => setReTagging(true),
     onSuccess: () => {
-      toast.success("Re-tagging started — models will be tagged in the background");
-      setTimeout(() => { setReTagging(false); utils.tags.list.invalidate(); }, 3000);
+      toast.success("Re-tagging started — this may take 10–30 minutes depending on your library size");
     },
     onError: () => { setReTagging(false); toast.error("Failed to start re-tagging"); },
+  });
+
+  const cancelAutoTag = trpc.tags.cancelAutoTag.useMutation({
+    onSuccess: () => { toast.success("Stop signal sent — finishing current model then stopping"); setReTagging(false); },
+    onError: () => toast.error("Failed to send stop signal"),
+  });
+
+  const [showTagLog, setShowTagLog] = React.useState(false);
+  const clearAutoTagLog = trpc.tags.clearAutoTagLog.useMutation();
+  const { data: autoTagLog, refetch: refetchTagLog } = trpc.tags.autoTagLog.useQuery(
+    { lines: 200 },
+    { enabled: showTagLog, refetchInterval: showTagLog ? 3000 : false }
+  );
+
+  const { data: autoTagProgress } = trpc.tags.autoTagProgress.useQuery(undefined, {
+    refetchInterval: (query) => {
+      const d = query.state.data;
+      if (d?.inProgress) return 2000;
+      if (reTagging) return 1000;
+      return false;
+    },
+    onSuccess: (d) => {
+      if (!d.inProgress && reTagging) {
+        setReTagging(false);
+        utils.tags.list.invalidate();
+      }
+    },
   });
 
   const createTag = trpc.tags.create.useMutation({
@@ -635,7 +688,7 @@ export default function Settings() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setShowAIGuide(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border/50 bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-orange-500/60 bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 hover:text-orange-300 transition-colors"
                     title="How to set up AI"
                   >
                     <HelpCircle className="w-3.5 h-3.5" />
@@ -670,9 +723,19 @@ export default function Settings() {
                     <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary border border-border/50">
                       <Key className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Model</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Text Model <span className="normal-case text-muted-foreground/60">(name/file tagging)</span></p>
                         <p className="text-sm font-mono text-foreground truncate">
-                          {(settings as any)?.llm_model || <span className="text-muted-foreground italic">Not set</span>}
+                          {(settings as any)?.llm_text_model || (settings as any)?.llm_model || <span className="text-muted-foreground italic">{(settings as any)?.recommended_text_model || "llama3.2"}</span>}
+                        </p>
+                      </div>
+                      <Lock className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                    </div>
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary border border-border/50">
+                      <ImageIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Vision Model <span className="normal-case text-muted-foreground/60">(image analysis)</span></p>
+                        <p className="text-sm font-mono text-foreground truncate">
+                          {(settings as any)?.llm_vision_model || (settings as any)?.llm_model || <span className="text-muted-foreground italic">{(settings as any)?.recommended_vision_model || "llava"}</span>}
                         </p>
                       </div>
                       <Lock className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
@@ -710,19 +773,53 @@ export default function Settings() {
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">Model name</label>
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Text Model
+                        <span className="ml-1.5 text-muted-foreground/60 font-normal">— fast model for name/file-based tag matching</span>
+                      </label>
                       <input
                         type="text"
-                        value={llmModel}
-                        onChange={(e) => setLlmModel(e.target.value)}
-                        placeholder="gpt-4o-mini  or  llama3.2-vision"
+                        value={llmTextModel}
+                        onChange={(e) => setLlmTextModel(e.target.value)}
+                        placeholder="llama3.2"
                         className="w-full px-3 py-2.5 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                       />
+                      <p className="text-[11px] text-muted-foreground/60">Leave blank to use the legacy Model field as fallback</p>
                     </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Vision Model
+                        <span className="ml-1.5 text-muted-foreground/60 font-normal">— vision model for hero image analysis</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={llmVisionModel}
+                        onChange={(e) => setLlmVisionModel(e.target.value)}
+                        placeholder="llava"
+                        className="w-full px-3 py-2.5 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                      />
+                      <p className="text-[11px] text-muted-foreground/60">Leave blank to use the legacy Model field as fallback</p>
+                    </div>
+                    <details className="group">
+                      <summary className="text-xs text-muted-foreground/60 cursor-pointer hover:text-muted-foreground transition-colors select-none">
+                        Advanced: Legacy single-model field (optional)
+                      </summary>
+                      <div className="mt-2 space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">Legacy Model name <span className="text-muted-foreground/50">(fallback when Text/Vision fields are blank)</span></label>
+                        <input
+                          type="text"
+                          value={llmModel}
+                          onChange={(e) => setLlmModel(e.target.value)}
+                          placeholder="gpt-4o-mini  or  llama3.2-vision"
+                          className="w-full px-3 py-2.5 text-sm rounded-lg bg-secondary border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        />
+                      </div>
+                    </details>
                     <button
                       onClick={() => {
-                        updateSettings.mutate({ llm_api_url: llmApiUrl, llm_api_key: llmApiKey, llm_model: llmModel });
+                        updateSettings.mutate({ llm_api_url: llmApiUrl, llm_api_key: llmApiKey, llm_model: llmModel, llm_text_model: llmTextModel, llm_vision_model: llmVisionModel });
                         setIsLlmEditing(false);
+                        setTimeout(() => refetchLlmStatus(), 1500);
                       }}
                       disabled={updateSettings.isPending}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 transition-opacity hover:opacity-90"
@@ -735,6 +832,125 @@ export default function Settings() {
               </div>
             </section>
 
+            {/* AI Status */}
+            <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">AI Status</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Live connection check for your configured AI model</p>
+                </div>
+                <button
+                  onClick={() => refetchLlmStatus()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Re-check AI connection"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Check Again
+                </button>
+              </div>
+              <div className="p-5 space-y-3">
+                {llmStatusLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Checking AI connection…
+                  </div>
+                ) : !llmStatus?.configured ? (
+                  <div className="flex items-start gap-3 rounded-lg bg-secondary border border-border/50 px-4 py-3">
+                    <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">AI not configured</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Set an API URL above and save to enable AI features.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Text model status */}
+                    {(() => {
+                      const name = llmStatus.textModelName || llmStatus.modelName || "llama3.2";
+                      const available = llmStatus.textModelName ? llmStatus.textModelAvailable : llmStatus.modelAvailable;
+                      return available ? (
+                        <div className="flex items-center gap-3 rounded-lg bg-green-500/10 border border-green-500/30 px-4 py-3">
+                          <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-green-300">Text model ready — <span className="font-mono">{name}</span></p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Used for name/file-based tag matching.</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-3 rounded-lg bg-orange-500/10 border border-orange-500/30 px-4 py-3">
+                          <AlertCircle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-orange-300">Text model not found: <span className="font-mono">{name}</span></p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Run <span className="font-mono">Download-AI-Model.bat</span> or set the Text Model field above.</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {/* Vision model status */}
+                    {(() => {
+                      const name = llmStatus.visionModelName || llmStatus.modelName || "llava";
+                      const available = llmStatus.visionModelName ? llmStatus.visionModelAvailable : llmStatus.modelAvailable;
+                      return available ? (
+                        <div className="flex items-center gap-3 rounded-lg bg-green-500/10 border border-green-500/30 px-4 py-3">
+                          <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-green-300">Vision model ready — <span className="font-mono">{name}</span></p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Used for hero image analysis.</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-3 rounded-lg bg-orange-500/10 border border-orange-500/30 px-4 py-3">
+                          <AlertCircle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-orange-300">Vision model not found: <span className="font-mono">{name}</span></p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Run <span className="font-mono">Download-AI-Model.bat</span> or set the Vision Model field above.</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {/* Available models list (shown when any model is missing) */}
+                    {(!llmStatus.textModelAvailable || !llmStatus.visionModelAvailable) && llmStatus.availableModels && llmStatus.availableModels.length > 0 && (
+                      <div className="rounded-lg bg-secondary border border-border/50 px-4 py-3">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Models available in Ollama — click to set as Text or Vision model:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {llmStatus.availableModels.map((m) => (
+                            <div key={m} className="flex gap-1">
+                              <button
+                                onClick={() => {
+                                  const baseName = m.replace(/:latest$/, "");
+                                  updateSettings.mutate({ llm_text_model: baseName });
+                                  setLlmTextModel(baseName);
+                                  setTimeout(() => refetchLlmStatus(), 1500);
+                                  toast.success(`Text model set to ${baseName}`);
+                                }}
+                                className="px-2 py-1 rounded-l-md bg-card border border-border text-[11px] font-mono text-foreground hover:border-primary hover:text-primary transition-colors"
+                                title={`Set ${m} as text model`}
+                              >
+                                {m}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const baseName = m.replace(/:latest$/, "");
+                                  updateSettings.mutate({ llm_vision_model: baseName });
+                                  setLlmVisionModel(baseName);
+                                  setTimeout(() => refetchLlmStatus(), 1500);
+                                  toast.success(`Vision model set to ${baseName}`);
+                                }}
+                                className="px-1.5 py-1 rounded-r-md bg-card border-y border-r border-border text-[10px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                                title={`Set ${m} as vision model`}
+                              >
+                                <ImageIcon className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/60 mt-2">Click the name to set as Text model · click the image icon to set as Vision model</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
             {/* Library Scan */}
             <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
               <div className="px-5 py-4 border-b border-border/50">
@@ -848,13 +1064,162 @@ export default function Settings() {
                     <h3 className="text-xs font-semibold text-foreground mb-0.5">Auto-Tagging</h3>
                     <p className="text-xs text-muted-foreground">Re-run AI tag suggestions for all models. Requires AI to be configured.</p>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => reTagAll.mutate()}
+                      disabled={reTagging || autoTagProgress?.inProgress}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                    >
+                      <Zap className={cn("w-3.5 h-3.5", (reTagging || autoTagProgress?.inProgress) && "animate-spin")} />
+                      Re-tag All Models
+                    </button>
+                    {autoTagProgress?.inProgress && (
+                      <button
+                        onClick={() => cancelAutoTag.mutate()}
+                        disabled={cancelAutoTag.isPending}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-950/60 border border-red-800/50 text-red-400 hover:bg-red-900/60 hover:text-red-300 disabled:opacity-40 transition-colors"
+                      >
+                        <Square className="w-3 h-3 fill-current" />
+                        Stop
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Live progress */}
+                  {autoTagProgress?.inProgress && (
+                    <div className="rounded-lg bg-secondary/60 border border-border/50 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Tagging in progress…
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {autoTagProgress.processed} / {autoTagProgress.total}
+                        </span>
+                      </div>
+                      {autoTagProgress.total > 0 && (
+                        <div className="w-full bg-border/50 rounded-full h-1.5">
+                          <div
+                            className="bg-orange-500 h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.round((autoTagProgress.processed / autoTagProgress.total) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                      {autoTagProgress.currentModel && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          Currently tagging: <span className="text-foreground">{autoTagProgress.currentModel}</span>
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Tagged so far: <span className="text-green-400 font-medium">{autoTagProgress.tagged}</span>
+                        {autoTagProgress.errors > 0 && (
+                          <span className="text-red-400 ml-2">· {autoTagProgress.errors} errors</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Last run summary */}
+                  {!autoTagProgress?.inProgress && autoTagProgress?.lastResult && (
+                    <div className="rounded-lg bg-secondary/40 border border-border/50 p-3">
+                      <p className="text-xs font-medium text-foreground mb-1">Last run summary</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                        <span className="text-muted-foreground">Models processed</span>
+                        <span className="text-foreground font-medium">{autoTagProgress.lastResult.processed}</span>
+                        <span className="text-muted-foreground">Models tagged</span>
+                        <span className="text-green-400 font-medium">{autoTagProgress.lastResult.tagged}</span>
+                        <span className="text-muted-foreground">Skipped (locked)</span>
+                        <span className="text-foreground font-medium">{autoTagProgress.lastResult.skipped}</span>
+                        {autoTagProgress.lastResult.errors > 0 && (
+                          <>
+                            <span className="text-muted-foreground">Errors</span>
+                            <span className="text-red-400 font-medium">{autoTagProgress.lastResult.errors}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                  {/* AI Tagging Log */}
+                  <div className="rounded-lg border border-border/50 overflow-hidden">
+                    <button
+                      onClick={() => { setShowTagLog(v => !v); if (!showTagLog) refetchTagLog(); }}
+                      className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary/40 hover:bg-secondary/60 transition-colors text-xs"
+                    >
+                      <span className="font-medium text-foreground">AI Tagging Log</span>
+                      <span className="text-muted-foreground">{showTagLog ? "▲ Hide" : "▼ Show"}</span>
+                    </button>
+                    {showTagLog && (
+                      <div className="bg-black/40">
+                        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30">
+                          <span className="text-[10px] text-muted-foreground">
+                            {autoTagLog?.exists ? `Last ${autoTagLog.lines.length} lines · auto-refreshes every 3s` : "No log file yet — start a Re-tag to generate one"}
+                          </span>
+                          <button
+                            onClick={() => { clearAutoTagLog.mutate(); setTimeout(() => refetchTagLog(), 300); }}
+                            className="text-[10px] text-muted-foreground/60 hover:text-red-400 transition-colors"
+                          >
+                            Clear log
+                          </button>
+                        </div>
+                        <div className="p-3 max-h-72 overflow-y-auto font-mono text-[10px] leading-relaxed space-y-0.5">
+                          {!autoTagLog?.exists || autoTagLog.lines.length === 0 ? (
+                            <p className="text-muted-foreground italic">No log entries yet.</p>
+                          ) : (
+                            [...autoTagLog.lines].reverse().map((line, i) => {
+                              const isError = line.includes("ERROR");
+                              const isMatch = line.includes("matched tags:") && !line.includes("[none]") && !line.includes("[]");
+                              const isNone = line.includes("matched tags: []") || line.includes("matched tags: [none]");
+                              const isStart = line.includes("=== START") || line.includes("=== DONE");
+                              return (
+                                <div
+                                  key={i}
+                                  className={cn(
+                                    "truncate",
+                                    isError && "text-red-400",
+                                    isMatch && "text-green-400",
+                                    isNone && "text-muted-foreground/50",
+                                    isStart && "text-yellow-400 font-semibold",
+                                    !isError && !isMatch && !isNone && !isStart && "text-muted-foreground"
+                                  )}
+                                  title={line}
+                                >
+                                  {line}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+              </div>
+            </section>
+
+            {/* App Controls */}
+            <section className="rounded-xl bg-card border border-border/50 overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/50">
+                <h2 className="text-sm font-semibold text-foreground">App Controls</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Restart the server after changing AI settings or running the model downloader</p>
+              </div>
+              <div className="px-5 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">Restart App</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Closes the server process. To restart, close this browser tab and re-open <span className="font-mono">My3DLibrary.exe</span>.
+                    </p>
+                  </div>
                   <button
-                    onClick={() => reTagAll.mutate()}
-                    disabled={reTagging}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                    onClick={async () => {
+                      toast.info('Shutting down… close this tab and re-open My3DLibrary.exe to restart.', { duration: 8000 });
+                      try { await fetch('/api/restart', { method: 'POST' }); } catch {}
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary border border-border/50 text-muted-foreground hover:text-foreground transition-colors shrink-0"
                   >
-                    <Zap className={cn("w-3.5 h-3.5", reTagging && "animate-spin")} />
-                    Re-tag All Models
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Restart
                   </button>
                 </div>
               </div>
@@ -1111,6 +1476,8 @@ function TrashTab() {
           </div>
         )}
       </section>
+
+
 
       {/* Confirm empty all trash dialog */}
       {confirmPurgeAll && (

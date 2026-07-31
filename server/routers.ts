@@ -8,7 +8,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { scanLocalLibrary, scanMultipleLibraries, isPathAccessible } from "./localScanner";
-import { autoTagAllModels } from "./autoTagger";
+import { autoTagAllModels, getAutoTagProgress, getAutoTagLogPath, stopAutoTag } from "./autoTagger";
 import { pickThumbnailsForAllModels, getThumbnailPickProgress, pickThumbnailForModel } from "./thumbnailPicker";
 import * as db from "./db";
 
@@ -63,9 +63,11 @@ export const appRouter = router({
         llm_api_url: z.string().optional(),
         llm_api_key: z.string().optional(),
         llm_model: z.string().optional(),
+        llm_text_model: z.string().optional(),
+        llm_vision_model: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        const keys = ["library_path", "app_name", "app_tagline", "llm_api_url", "llm_api_key", "llm_model"] as const;
+        const keys = ["library_path", "app_name", "app_tagline", "llm_api_url", "llm_api_key", "llm_model", "llm_text_model", "llm_vision_model"] as const;
         for (const key of keys) {
           if (input[key] !== undefined) await db.setSetting(key, input[key] as string);
         }
@@ -75,6 +77,8 @@ export const appRouter = router({
         if (input.llm_api_url !== undefined) ENV.llmApiUrl = input.llm_api_url;
         if (input.llm_api_key !== undefined) ENV.llmApiKey = input.llm_api_key;
         if (input.llm_model !== undefined) ENV.llmModel = input.llm_model;
+        if (input.llm_text_model !== undefined) ENV.llmTextModel = input.llm_text_model;
+        if (input.llm_vision_model !== undefined) ENV.llmVisionModel = input.llm_vision_model;
         return { success: true };
       }),
     validateLibraryPath: adminProcedure
@@ -89,6 +93,25 @@ export const appRouter = router({
       }),
     get: adminProcedure.query(async () => {
       const all = await db.getAllSettings();
+
+      // Read model-config.txt written by Download-AI-Model.bat to get recommended defaults
+      // Format: text=llama3.2\nvision=llava  (or llama3.2:3b / moondream for CPU mode)
+      let recommendedTextModel = "llama3.2";
+      let recommendedVisionModel = "llava";
+      try {
+        const { readFileSync, existsSync } = await import("fs");
+        const { join } = await import("path");
+        const configPath = join(process.cwd(), "ollama", "model-config.txt");
+        if (existsSync(configPath)) {
+          const lines = readFileSync(configPath, "utf-8").split("\n");
+          for (const line of lines) {
+            const [k, v] = line.trim().split("=");
+            if (k === "text" && v) recommendedTextModel = v.trim();
+            if (k === "vision" && v) recommendedVisionModel = v.trim();
+          }
+        }
+      } catch {}
+
       return {
         library_path: all["library_path"] || "",
         app_name: all["app_name"] || "",
@@ -96,6 +119,10 @@ export const appRouter = router({
         llm_api_url: all["llm_api_url"] || "",
         llm_api_key: all["llm_api_key"] || "",
         llm_model: all["llm_model"] || "",
+        llm_text_model: all["llm_text_model"] || "",
+        llm_vision_model: all["llm_vision_model"] || "",
+        recommended_text_model: recommendedTextModel,
+        recommended_vision_model: recommendedVisionModel,
       };
     }),
     llmStatus: publicProcedure.query(async () => {
@@ -104,22 +131,28 @@ export const appRouter = router({
       const { isLLMConfigured, listLLMModels } = await import("./_core/llm");
       const { ENV } = await import("./_core/env");
       if (!isLLMConfigured()) {
-        return { configured: false, modelAvailable: false, availableModels: [] as string[], modelName: ENV.llmModel || "" };
+        return { configured: false, modelAvailable: false, availableModels: [] as string[], modelName: ENV.llmModel || "", textModelName: ENV.llmTextModel || "", visionModelName: ENV.llmVisionModel || "", textModelAvailable: false, visionModelAvailable: false };
       }
       try {
         const { data: models } = await listLLMModels();
+        const modelIds = models.map((m) => m.id.toLowerCase());
+        const checkModel = (name: string) => !!name && modelIds.some(id => id === name.toLowerCase() || id.startsWith(name.toLowerCase()));
         const modelName = ENV.llmModel?.toLowerCase() ?? "";
-        const modelAvailable = models.some(
-          (m) => m.id.toLowerCase() === modelName || m.id.toLowerCase().startsWith(modelName)
-        );
+        const modelAvailable = checkModel(modelName);
+        const textModelAvailable = ENV.llmTextModel ? checkModel(ENV.llmTextModel) : false;
+        const visionModelAvailable = ENV.llmVisionModel ? checkModel(ENV.llmVisionModel) : false;
         return {
           configured: true,
           modelAvailable,
           availableModels: models.map((m) => m.id),
           modelName: ENV.llmModel || "",
+          textModelName: ENV.llmTextModel || "",
+          visionModelName: ENV.llmVisionModel || "",
+          textModelAvailable,
+          visionModelAvailable,
         };
       } catch {
-        return { configured: true, modelAvailable: false, availableModels: [] as string[], modelName: ENV.llmModel || "" };
+        return { configured: true, modelAvailable: false, availableModels: [] as string[], modelName: ENV.llmModel || "", textModelName: ENV.llmTextModel || "", visionModelName: ENV.llmVisionModel || "", textModelAvailable: false, visionModelAvailable: false };
       }
     }),
     // Library paths management (multi-drive support)
@@ -187,7 +220,14 @@ export const appRouter = router({
         const current = input.path;
         if (!existsSync(current)) throw new TRPCError({ code: "BAD_REQUEST", message: "Path does not exist" });
         const parentPath = nodePath.dirname(current);
-        const parent = parentPath !== current ? parentPath : null;
+        // On Windows, dirname of a drive root (e.g. "C:\") returns itself.
+        // Detect this and set parent to "" so the Up button returns to the drive list.
+        let parent: string | null;
+        if (parentPath === current) {
+          parent = process.platform === "win32" ? "" : null;
+        } else {
+          parent = parentPath;
+        }
         let entries: { name: string; path: string }[] = [];
         try {
           entries = readdirSync(current, { withFileTypes: true })
@@ -601,6 +641,33 @@ export const appRouter = router({
       // forceAll=true: re-tag even locked models when manually triggered
       autoTagAllModels(true).catch((err) => console.warn("[AutoTagger] Manual re-tag failed:", err));
       return { success: true, message: "Re-tagging started in background" };
+    }),
+    cancelAutoTag: adminProcedure.mutation(() => {
+      stopAutoTag();
+      return { success: true };
+    }),
+    autoTagProgress: adminProcedure.query(() => getAutoTagProgress()),
+    autoTagLog: adminProcedure
+      .input(z.object({ lines: z.number().min(1).max(500).default(100) }))
+      .query(async ({ input }) => {
+        const logPath = getAutoTagLogPath();
+        try {
+          const { existsSync, readFileSync } = await import("fs");
+          if (!existsSync(logPath)) return { lines: [], exists: false };
+          const content = readFileSync(logPath, "utf8");
+          const all = content.split("\n").filter(Boolean);
+          return { lines: all.slice(-input.lines), exists: true };
+        } catch {
+          return { lines: [], exists: false };
+        }
+      }),
+    clearAutoTagLog: adminProcedure.mutation(async () => {
+      const logPath = getAutoTagLogPath();
+      try {
+        const { writeFileSync } = await import("fs");
+        writeFileSync(logPath, "");
+      } catch { /* ignore */ }
+      return { success: true };
     }),
   }),
 

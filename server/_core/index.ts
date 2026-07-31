@@ -53,7 +53,13 @@ async function startServer() {
     if (!process.env.LLM_MODEL && dbSettings["llm_model"]) {
       ENV.llmModel = dbSettings["llm_model"];
     }
-    console.log("[Startup] LLM config:", ENV.llmApiUrl ? `URL=${ENV.llmApiUrl}, model=${ENV.llmModel}` : "not configured");
+    if (!process.env.LLM_TEXT_MODEL && dbSettings["llm_text_model"]) {
+      ENV.llmTextModel = dbSettings["llm_text_model"];
+    }
+    if (!process.env.LLM_VISION_MODEL && dbSettings["llm_vision_model"]) {
+      ENV.llmVisionModel = dbSettings["llm_vision_model"];
+    }
+    console.log("[Startup] LLM config:", ENV.llmApiUrl ? `URL=${ENV.llmApiUrl}, model=${ENV.llmModel}, text=${ENV.llmTextModel || "(same as model)"}, vision=${ENV.llmVisionModel || "(same as model)"}` : "not configured");
   } catch (e) {
     console.warn("[Startup] Could not load LLM settings from DB:", e);
   }
@@ -172,6 +178,13 @@ async function startServer() {
   // Return the app root directory (used by frontend to show path in AI setup banner)
   app.get("/api/app-root", (req, res) => {
     res.json({ appRoot: process.cwd() });
+  });
+
+  // Restart endpoint — exits the Node process so launcher.ps1 can restart it fresh
+  // Only available in portable/production mode (not in dev server)
+  app.post("/api/restart", (_req, res) => {
+    res.json({ ok: true, message: "Restarting…" });
+    setTimeout(() => process.exit(0), 500);
   });
 
   // tRPC API
