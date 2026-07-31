@@ -228,7 +228,7 @@ function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => v
 
               <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2.5 space-y-2">
                 <p className="font-medium text-orange-400">Step 1 — Get your free API key</p>
-                <p>Go to <span className="font-mono text-primary">console.groq.com</span> and sign up for free (no credit card needed). Click <strong className="text-foreground">API Keys</strong> in the left sidebar, then <strong className="text-foreground">Create API Key</strong>. Copy the key — it starts with <span className="font-mono">gsk_</span>.</p>
+                <p>Go to <span className="font-mono text-primary">console.groq.com</span> and sign up for free (no credit card needed). Once logged in, click <strong className="text-foreground">API Keys</strong> in the <strong className="text-foreground">top menu bar</strong>, then click <strong className="text-foreground">+ Create API Key</strong>. Copy the key — it starts with <span className="font-mono">gsk_</span>.</p>
               </div>
 
               <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1.5">
