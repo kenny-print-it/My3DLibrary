@@ -28,6 +28,8 @@ for (const f of ["Start.bat", "Stop.bat", "README.txt", "Download-AI-Model.bat",
 }
 // 2b. Silent VBScript launcher (new — hides terminal windows)
 cpSync(`${WIN_EXTRAS}/My3DLibrary-Portable/Start.vbs`, `${STAGING}/My3DLibrary-Portable/Start.vbs`);
+// 2c. PowerShell launcher script (required by Start.vbs and My3DLibrary.exe)
+cpSync(`${WIN_EXTRAS}/My3DLibrary-Portable/launcher.ps1`, `${STAGING}/My3DLibrary-Portable/launcher.ps1`);
 
 // 3. Runtime (node.exe)
 cpSync(`${WIN_EXTRAS}/My3DLibrary-Portable/runtime`, `${STAGING}/My3DLibrary-Portable/runtime`, { recursive: true });
