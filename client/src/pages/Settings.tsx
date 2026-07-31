@@ -216,10 +216,40 @@ function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => v
             </div>
           </div>
 
-          {/* Option B: OpenAI */}
+          {/* Option B: Groq — Recommended */}
           <div>
             <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-secondary border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">B</span>
+              <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">B</span>
+              Groq (Free, cloud-based)
+              <span className="text-[10px] font-normal text-orange-400 bg-orange-500/10 border border-orange-500/30 rounded px-1.5 py-0.5 ml-0.5">Recommended</span>
+            </h3>
+            <div className="space-y-2.5 text-muted-foreground text-xs">
+              <p>Groq is a free cloud AI service — <strong className="text-foreground">no GPU required, no large downloads.</strong> It works on any PC and is very fast. You just need a free account.</p>
+
+              <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2.5 space-y-2">
+                <p className="font-medium text-orange-400">Step 1 — Get your free API key</p>
+                <p>Go to <span className="font-mono text-primary">console.groq.com</span> and sign up for free (no credit card needed). Click <strong className="text-foreground">API Keys</strong> in the left sidebar, then <strong className="text-foreground">Create API Key</strong>. Copy the key — it starts with <span className="font-mono">gsk_</span>.</p>
+              </div>
+
+              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1.5">
+                <p className="font-medium text-foreground">Step 2 — Enter these settings (click Edit above to unlock)</p>
+                <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://api.groq.com/openai/v1</span></p>
+                <p><span className="font-medium text-foreground">API Key:</span> your <span className="font-mono">gsk_…</span> key</p>
+                <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">llama-3.1-8b-instant</span></p>
+                <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">llama-3.2-11b-vision-preview</span> <span className="text-muted-foreground italic">(requires free phone verification on Groq — or use <span className="font-mono">llama-3.1-8b-instant</span> for text-only tagging)</span></p>
+              </div>
+
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-2.5">
+                <p className="font-medium text-blue-400">✅ How to check it's working</p>
+                <p className="mt-1">After saving, scroll down to <strong className="text-foreground">AI Status</strong> and click <strong className="text-foreground">Check Again</strong>. Green checkmarks mean it's ready. Then click <strong className="text-foreground">Re-tag All</strong>.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Option C: OpenAI */}
+          <div>
+            <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-secondary border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">C</span>
               OpenAI (Paid, cloud-based)
             </h3>
             <div className="space-y-2 text-muted-foreground text-xs">
@@ -227,15 +257,16 @@ function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => v
               <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1">
                 <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://api.openai.com/v1</span></p>
                 <p><span className="font-medium text-foreground">API Key:</span> your <span className="font-mono">sk-…</span> key from platform.openai.com</p>
-                <p><span className="font-medium text-foreground">Model:</span> <span className="font-mono">gpt-4o-mini</span></p>
+                <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">gpt-4o-mini</span></p>
+                <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">gpt-4o-mini</span></p>
               </div>
             </div>
           </div>
 
-          {/* Option C: LM Studio */}
+          {/* Option D: LM Studio */}
           <div>
             <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-secondary border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">C</span>
+              <span className="w-5 h-5 rounded-full bg-secondary border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">D</span>
               LM Studio (Free, GUI-based)
             </h3>
             <div className="space-y-2 text-muted-foreground text-xs">
@@ -243,7 +274,8 @@ function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => v
               <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1">
                 <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:1234/v1</span></p>
                 <p><span className="font-medium text-foreground">API Key:</span> leave blank</p>
-                <p><span className="font-medium text-foreground">Model:</span> the model name shown in LM Studio</p>
+                <p><span className="font-medium text-foreground">Text Model:</span> the model name shown in LM Studio</p>
+                <p><span className="font-medium text-foreground">Vision Model:</span> the model name shown in LM Studio</p>
               </div>
             </div>
           </div>

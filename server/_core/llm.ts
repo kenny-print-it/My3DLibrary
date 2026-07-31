@@ -219,9 +219,17 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
+// Normalize the base URL so users can enter either:
+//   https://api.groq.com/openai/v1   (versioned — common copy-paste from docs)
+//   https://api.groq.com/openai      (base URL style)
+//   http://localhost:11434            (Ollama — no /v1 suffix)
+// Strip any trailing /v1 (or /v2 etc.) before appending the versioned path.
+const normalizeBaseUrl = (url: string) =>
+  url.replace(/\/+$/, "").replace(/\/v\d+$/, "");
+
 const resolveApiUrl = () => {
   if (!ENV.llmApiUrl) throw new Error("LLM not configured. Set LLM_API_URL in your .env file.");
-  return `${ENV.llmApiUrl.replace(/\/+$/, "")}/v1/chat/completions`;
+  return `${normalizeBaseUrl(ENV.llmApiUrl)}/v1/chat/completions`;
 };
 
 const assertApiKey = () => {
@@ -449,7 +457,7 @@ export async function listLLMModels(): Promise<ModelsResponse> {
   assertApiKey();
 
   if (!ENV.llmApiUrl) throw new Error("LLM not configured. Set LLM_API_URL in your .env file.");
-  const url = `${ENV.llmApiUrl.replace(/\/+$/, "")}/v1/models`;
+  const url = `${normalizeBaseUrl(ENV.llmApiUrl)}/v1/models`;
 
   const response = await fetchWithBackoff(url, {
     headers: { ...(ENV.llmApiKey ? { authorization: `Bearer ${ENV.llmApiKey}` } : {}) },
