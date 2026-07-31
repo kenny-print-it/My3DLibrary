@@ -39,7 +39,7 @@ export default function PendingApproval({ status }: PendingApprovalProps) {
         <div className="relative">
           <div className={`absolute inset-0 rounded-full blur-2xl scale-110 ${isDenied ? "bg-red-500/20" : "bg-amber-500/20"}`} />
           <img
-            src="/manus-storage/kenny_logo_7f01af60.png"
+            src="/kenny-logo.png"
             alt="Kenny Print It?"
             className="relative w-24 h-24 rounded-full object-cover ring-2 ring-border/50 shadow-2xl"
           />

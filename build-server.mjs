@@ -67,3 +67,4 @@ const slimDst = resolve(root, "node_modules_dist");
 console.log("📂 Copying slim node_modules for packaging...");
 execSync(`rm -rf "${slimDst}" && cp -r "${slimSrc}" "${slimDst}"`, { stdio: "inherit" });
 console.log("✅ node_modules_dist ready");
+
