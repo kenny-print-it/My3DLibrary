@@ -86,11 +86,26 @@ function AIStartupCheck() {
     refetchOnWindowFocus: false,
   });
 
+  // Consider AI ready when:
+  // - dual-model mode: both text AND vision models are available
+  // - legacy single-model mode: modelAvailable is true
+  const textReady = status?.textModelName ? status.textModelAvailable : status?.modelAvailable;
+  const visionReady = status?.visionModelName ? status.visionModelAvailable : status?.modelAvailable;
+  const aiReady = !!(textReady && visionReady) || !!(status?.modelAvailable && !status?.textModelName);
+
   // Don't show anything while loading, already dismissed, or AI is fully ready
-  if (isLoading || dismissed || status?.modelAvailable) return null;
+  if (isLoading || dismissed || aiReady) return null;
 
   const notConfigured = !status?.configured;
-  const modelName = status?.modelName || "llava";
+
+  // Build a label for the missing model(s)
+  const missingModels: string[] = [];
+  if (status?.configured) {
+    if (status.textModelName && !status.textModelAvailable) missingModels.push(status.textModelName);
+    if (status.visionModelName && !status.visionModelAvailable) missingModels.push(status.visionModelName);
+    if (!status.textModelName && !status.modelAvailable) missingModels.push(status.modelName || "llava");
+  }
+  const modelName = missingModels.length > 0 ? missingModels.join(" & ") : (status?.modelName || "llava");
 
   const handleRunSetup = async () => {
     setLaunching(true);
