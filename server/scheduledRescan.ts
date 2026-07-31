@@ -1,5 +1,5 @@
 /**
- * Scheduled rescan handler — called by the Manus Heartbeat cron system.
+ * Scheduled rescan handler — called by the Heartbeat cron system.
  *
  * The platform POSTs to /api/scheduled/rescan on the configured interval.
  * This handler authenticates the cron caller, then runs the same Drive scan

@@ -1,5 +1,5 @@
 /**
- * Local filesystem storage — replaces the Manus S3/Forge storage layer.
+ * Local filesystem storage for the portable version.
  * Files are stored under DATA_DIR/storage/ and served via /local-storage/*.
  */
 import fs from "fs/promises";

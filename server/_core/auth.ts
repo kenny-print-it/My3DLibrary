@@ -1,6 +1,6 @@
 /**
  * Local authentication — username/password with bcrypt + JWT session cookie.
- * Replaces the Manus OAuth SDK for the self-hosted local version.
+ * Local authentication for the self-hosted portable version.
  */
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
