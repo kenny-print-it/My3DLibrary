@@ -9,7 +9,7 @@
 1. **Extract** this ZIP to any folder (e.g. `D:\My3DLibrary\` or a USB drive)
 2. **Double-click `Start.bat`**
 3. Your browser will open to `http://localhost:3000`
-4. On first run, create your admin account
+4. On first run, click "Enter Library" to begin
 
 That's it. No Docker, no installation, no admin rights needed.
 

@@ -15,9 +15,11 @@ My3DLibrary is a portable Windows app that turns your folders of STL files into 
 
 - **Browse** your collection by collection and category with thumbnail previews
 - **View** models in a built-in interactive 3D STL viewer
-- **Auto-tag** models using local AI (Ollama/LLaVA) or OpenAI — no cloud required
+- **Auto-tag** models using local AI (Ollama) or free cloud AI (Groq) — no subscription required
 - **Search** by name, tag, or collection
 - **Manage** multiple library locations across different drives
+- **Recycle bin** — soft-delete models with restore and purge options
+- **Bulk tag** — apply or remove tags across multiple models at once
 - **Portable** — runs from a USB drive, no install, no admin rights needed
 
 > Your files never leave your computer. My3DLibrary is 100% local.
@@ -40,7 +42,7 @@ Just unzip and double-click `My3DLibrary.exe`. That's it.
 
 ## Quick Start
 
-1. Download and unzip `My3DLibrary-Portable-v1.2-Beta.zip`
+1. Download and unzip `My3DLibrary-Windows-v1.2-Beta.zip`
 2. Double-click `My3DLibrary.exe`
 3. Your browser opens automatically at `http://localhost:3000`
 4. Go to **Settings → Library**, click **Add Folder**, and point it at your models folder
@@ -60,38 +62,41 @@ Install [Google Drive for Desktop](https://www.google.com/drive/download/) — i
 
 My3DLibrary can automatically tag your models by looking at their thumbnail images. AI is completely optional — thumbnails and the STL viewer work without it.
 
-| Option | Cost | Setup |
-|---|---|---|
-| **Ollama + LLaVA** (recommended) | Free | See steps below |
-| **OpenAI GPT-4o** | ~$0.01/model | Enter your API key in Settings |
-| **LM Studio** | Free | Start the local server, point Settings at `http://localhost:1234/v1` |
+| Option | Cost | GPU Required | Setup |
+|---|---|---|---|
+| **Groq** ⭐ Recommended | Free | No | Get a free API key at [console.groq.com](https://console.groq.com) |
+| **Ollama (local)** | Free | Recommended | Run `Download-AI-Model.bat` |
+| **OpenAI** | ~$0.01/model | No | Enter your API key in Settings |
+| **LM Studio** | Free | Recommended | Start the local server, point Settings at `http://localhost:1234/v1` |
 
-### Setting Up Ollama (Free, Local AI)
+### Option A — Groq (Free Cloud AI, No GPU Needed)
 
-1. **Download and install Ollama** from [ollama.com](https://ollama.com/download/windows)  
-   Run `OllamaSetup.exe` and follow the prompts to install it on your PC.
+Groq is the easiest way to get started. It's free, fast, and works on any PC.
 
-2. **Copy `ollama.exe` into the My3DLibrary app folder**  
-   After installation, locate the file at:  
-   ```
-   C:\Users\<YourName>\AppData\Local\Programs\Ollama\ollama.exe
-   ```  
-   Copy it into the `ollama\` folder inside your unzipped My3DLibrary app:  
-   ```
-   My3DLibrary-Portable-New\
-     My3DLibrary-Portable\
-       ollama\
-         ollama.exe   ← paste it here
-   ```
+1. Go to [console.groq.com](https://console.groq.com) and create a free account
+2. Click **API Keys** in the top menu bar → **Create API Key**
+3. Copy the key (starts with `gsk_...`)
+4. In My3DLibrary, go to **Settings → AI / LLM Configuration → Edit** and enter:
+   - **API URL:** `https://api.groq.com/openai/v1`
+   - **API Key:** your `gsk_...` key
+   - **Text Model:** `llama-3.1-8b-instant`
+   - **Vision Model:** `llama-3.2-11b-vision-preview` *(requires free phone verification on Groq)*
+5. Click **Save & Lock**, then **Check Again** — both models should turn green
 
-3. **Run `Download-AI-Model.bat`** (included in the app folder)  
-   This downloads the LLaVA vision model (~4.7 GB) into the app's `ollama\models\` folder. Only needs to be done once. Requires an internet connection for the download — after that it works fully offline.
+> **No GPU needed.** Groq runs in the cloud and is free for personal use.
 
-4. **Start My3DLibrary normally** — AI tagging is now available. Go to **Settings → AI/LLM Configuration** and set:  
-   - API URL: `http://localhost:11434/v1`  
-   - Model: `llava`
+### Option B — Ollama (Free Local AI)
 
-> **Tip:** The LLaVA model is stored inside the app folder, so you can move or copy the entire `My3DLibrary-Portable` folder to another PC or USB drive and it will work without re-downloading the model.
+Ollama runs entirely on your PC. A GPU is recommended for best performance, but CPU mode is available for PCs without a dedicated GPU.
+
+1. **Run `Download-AI-Model.bat`** (included in the app folder)
+   - It will automatically download and install Ollama if needed
+   - It will ask whether you want **GPU mode** (~7 GB download) or **CPU mode** (~3.7 GB download)
+   - It downloads the correct models for your choice and configures the app automatically
+2. **Close and reopen `My3DLibrary.exe`** — the app restarts with AI ready to use
+3. Go to **Settings → AI Status** and click **Check Again** to confirm both models are green
+
+> **Tip:** The models are stored inside the app folder, so you can move the entire `My3DLibrary-Portable` folder to another PC or USB drive and it will work without re-downloading.
 
 ---
 
@@ -121,7 +126,7 @@ node build-server.mjs
 - **Backend:** Node.js, Express, tRPC, Drizzle ORM
 - **Database:** SQLite (via better-sqlite3)
 - **3D Viewer:** Three.js / STLLoader
-- **AI:** Ollama (LLaVA / llama3.2-vision) or OpenAI-compatible API
+- **AI:** Ollama (llama3.2 + moondream/llava) or any OpenAI-compatible API (Groq, OpenAI, LM Studio)
 
 ---
 
