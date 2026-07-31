@@ -9,6 +9,7 @@ import ModelDetail from "./pages/ModelDetail";
 import Settings from "./pages/Settings";
 import Resources from "./pages/Resources";
 import About from "./pages/About";
+import Changelog from "./pages/Changelog";
 import Login from "./pages/Login";
 import NavBar from "./components/NavBar";
 import { useAuth } from "./_core/hooks/useAuth";
@@ -59,6 +60,7 @@ function Router() {
             {() => <AuthGate component={Resources} />}
           </Route>
           <Route path="/about" component={About} />
+          <Route path="/changelog" component={Changelog} />
           <Route path="/login" component={Login} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
