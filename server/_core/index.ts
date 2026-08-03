@@ -224,7 +224,7 @@ async function startServer() {
   });
 
   // Save generated thumbnail — accepts raw PNG bytes (application/octet-stream)
-  // This avoids tRPC's internal body-size limit that truncates large base64 payloads.
+  // Uses top-level imports (no dynamic import) to avoid bundler issues.
   app.post("/api/save-thumbnail", express.raw({ type: "application/octet-stream", limit: "20mb" }), async (req, res) => {
     try {
       const modelId = parseInt((req.query as any).modelId);
@@ -233,59 +233,70 @@ async function startServer() {
         return;
       }
       const pngBuffer = req.body as Buffer;
-      if (!pngBuffer || pngBuffer.length < 100) {
+      if (!Buffer.isBuffer(pngBuffer) || pngBuffer.length < 100) {
         res.status(400).json({ error: "No PNG data received" });
         return;
       }
 
-      const nodePath = require("path") as typeof import("path");
-      const { getDb } = await import("../db");
-      const { models } = await import("../../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
-      const db = await import("../db");
+      const { getDb, getModelById, updateModelHeroImage, getEnabledLibraryPaths } = await import("../db");
 
-      const model = await db.getModelById(modelId);
+      const model = await getModelById(modelId);
       if (!model) {
         res.status(404).json({ error: "Model not found" });
         return;
       }
 
-      const folderPath = (model as any).rootPath as string | null;
+      const folderPath = model.rootPath;
       if (!folderPath) {
         res.status(400).json({ error: "Model has no folder path" });
         return;
       }
 
+      // Write PNG to model folder
       const fileName = `thumbnail_generated_${Date.now()}.png`;
-      const absPath = nodePath.join(folderPath, fileName);
+      const absPath = path.join(folderPath, fileName);
       fs.writeFileSync(absPath, pngBuffer);
 
+      // Build the relative path from the library root (for /local-files/ serving)
+      const libraryRoots = await getEnabledLibraryPaths();
+      let serveRelPath = fileName; // fallback: just filename
+      for (const { path: libRoot } of libraryRoots) {
+        const resolved = path.resolve(libRoot);
+        const resolvedAbs = path.resolve(absPath);
+        if (resolvedAbs.startsWith(resolved + path.sep) || resolvedAbs.startsWith(resolved + "/")) {
+          serveRelPath = path.relative(libRoot, absPath).replace(/\\/g, "/");
+          break;
+        }
+      }
+
+      const imageUrl = `/local-files/${serveRelPath}`;
+
       // Register in images array
-      const imgs: any[] = JSON.parse((model.images as any) ?? "[]");
-      const relativePath = nodePath.relative(folderPath, absPath).replace(/\\/g, "/");
-      const fileId = `generated_thumb_${Date.now()}`;
-      imgs.unshift({
-        fileId,
-        name: fileName,
-        absPath,
-        relativePath,
-        thumbnailLink: `/local-files/${relativePath}`,
-        webContentLink: `/local-files/${relativePath}`,
-        mimeType: "image/png",
-      });
-      const dbConn = await getDb();
-      if (dbConn) {
-        await dbConn.update(models)
+      const db = await getDb();
+      if (db) {
+        const { models } = await import("../../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const imgs: any[] = JSON.parse((model.images as any) ?? "[]");
+        imgs.unshift({
+          fileId: `generated_thumb_${Date.now()}`,
+          name: fileName,
+          absPath,
+          relativePath: path.relative(folderPath, absPath).replace(/\\/g, "/"),
+          thumbnailLink: imageUrl,
+          webContentLink: imageUrl,
+          mimeType: "image/png",
+        });
+        await db.update(models)
           .set({ images: JSON.stringify(imgs) as any, imageCount: imgs.length })
           .where(eq(models.id, modelId));
       }
 
       // Set as hero image
-      await db.updateModelHeroImage(modelId, `/local-files/${relativePath}`, "manual");
+      await updateModelHeroImage(modelId, imageUrl, "manual");
 
-      res.json({ success: true, imageUrl: `/local-files/${relativePath}`, fileName });
+      res.json({ success: true, imageUrl, fileName });
     } catch (err: any) {
-      console.error("[save-thumbnail] Error:", err);
+      console.error("[save-thumbnail] Error:", err?.stack || err?.message || err);
       res.status(500).json({ error: err?.message || "Failed to save thumbnail" });
     }
   });

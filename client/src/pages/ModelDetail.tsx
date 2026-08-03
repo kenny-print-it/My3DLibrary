@@ -241,8 +241,17 @@ export default function ModelDetail() {
       body: blob,
     });
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ error: resp.statusText }));
-      throw new Error(err.error || `HTTP ${resp.status}`);
+      // Server may return JSON error or HTML — handle both
+      const text = await resp.text().catch(() => resp.statusText);
+      let errMsg = `HTTP ${resp.status}`;
+      try {
+        const parsed = JSON.parse(text);
+        errMsg = parsed.error || parsed.message || errMsg;
+      } catch {
+        // Not JSON — use first 120 chars of the response as the error
+        errMsg = text.slice(0, 120) || errMsg;
+      }
+      throw new Error(errMsg);
     }
     return resp.json() as Promise<{ success: boolean; imageUrl: string; fileName: string }>;
   };
