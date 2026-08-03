@@ -6,8 +6,7 @@ import { ArrowLeft, Heart, ExternalLink, Download, Box, ChevronLeft, ChevronRigh
   Search, ArrowUpDown, ChevronDown, ChevronUp, Package, Link, Trash2, Sparkles, Loader2
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import STLViewer from "@/components/STLViewer";
-import { generateThumbnail } from "@/lib/generateThumbnail";
+import STLViewer, { type STLViewerHandle } from "@/components/STLViewer";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -80,6 +79,8 @@ export default function ModelDetail() {
   const [viewerFileIdx, setViewerFileIdx] = useState(0);
   // Thumbnail generation state
   const [thumbGenProgress, setThumbGenProgress] = useState<number | null>(null);
+  // Ref to the STLViewer for screenshot capture
+  const viewerRef = useRef<STLViewerHandle>(null);
   const [confirmDeleteModel, setConfirmDeleteModel] = useState(false);
   const { user } = useAuth();
   const isOwner = !!(user?.role === "admin" || user?.openId === (window as any).__OWNER_OPEN_ID);
@@ -334,10 +335,17 @@ export default function ModelDetail() {
     ? [rawImages[heroIdx], ...rawImages.filter((_, i) => i !== heroIdx)]
     : rawImages;
   // All viewable 3D files (STL + 3MF) for the viewer fallback (only shown when no images exist)
+  // 3MF files are prioritized over STL files
   const viewableFiles: any[] = images.length === 0
-    ? ((model.modelFiles as any[] | null) || []).filter((f: any) =>
-        (f.name?.toLowerCase().endsWith(".stl") || f.name?.toLowerCase().endsWith(".3mf")) && f.webContentLink
-      )
+    ? ((model.modelFiles as any[] | null) || [])
+        .filter((f: any) =>
+          (f.name?.toLowerCase().endsWith(".stl") || f.name?.toLowerCase().endsWith(".3mf")) && f.webContentLink
+        )
+        .sort((a: any, b: any) => {
+          const a3mf = a.name?.toLowerCase().endsWith(".3mf") ? 0 : 1;
+          const b3mf = b.name?.toLowerCase().endsWith(".3mf") ? 0 : 1;
+          return a3mf - b3mf;
+        })
     : [];
   const rawFiles: any[] = model.modelFiles as any[] || [];
 
@@ -503,6 +511,7 @@ export default function ModelDetail() {
               />
             ) : viewableFiles.length > 0 ? (
               <STLViewer
+                ref={viewerRef}
                 url={viewableFiles[viewerFileIdx]?.webContentLink}
                 fileType={viewableFiles[viewerFileIdx]?.name?.toLowerCase().endsWith(".3mf") ? "3mf" : "stl"}
                 className="w-full h-full"
@@ -562,19 +571,17 @@ export default function ModelDetail() {
               <button
                 onClick={async () => {
                   if (thumbGenProgress !== null) return;
-                  const file = viewableFiles[viewerFileIdx];
-                  if (!file?.webContentLink) return;
+                  if (!viewerRef.current?.isLoaded()) {
+                    toast.error("3D model is still loading — please wait.");
+                    return;
+                  }
                   try {
-                    setThumbGenProgress(0);
-                    const blob = await generateThumbnail({
-                      url: file.webContentLink,
-                      fileType: file.name?.toLowerCase().endsWith(".3mf") ? "3mf" : "stl",
-                      size: 512,
-                      candidates: 28,
-                      onProgress: (p) => setThumbGenProgress(Math.round(p * 100)),
-                    });
-                    // POST raw PNG bytes directly to avoid tRPC body-size limits
+                    setThumbGenProgress(10);
+                    const blob = await viewerRef.current.captureScreenshot();
+                    if (!blob) throw new Error("Failed to capture canvas screenshot");
+                    setThumbGenProgress(60);
                     await saveThumbnailBlob(blob);
+                    setThumbGenProgress(100);
                     utils.models.get.invalidate({ id: modelId });
                     utils.models.list.invalidate();
                     toast.success("Thumbnail saved! It will now appear on the library card.");

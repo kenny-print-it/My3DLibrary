@@ -94,9 +94,12 @@ function ModelCard({ model, onClick, selectMode = false, isSelected = false, onT
   const [imgError, setImgError] = useState(false);
   // Prefer AI-selected heroImage, fall back to first image — use proxy to avoid expiring Drive URLs
   const thumb = getModelImageUrl(model.images, model.heroImage, 400);
-  // First STL file for viewer fallback
-  const firstStl = !thumb ? (model.modelFiles as any[] | null)?.find(
-    (f: any) => f.name?.toLowerCase().endsWith(".stl") && f.webContentLink
+  // First viewable 3D file for viewer fallback — 3MF preferred over STL
+  const firstViewable = !thumb ? (
+    (model.modelFiles as any[] | null)
+      ?.filter((f: any) => (f.name?.toLowerCase().endsWith(".3mf") || f.name?.toLowerCase().endsWith(".stl")) && f.webContentLink)
+      ?.sort((a: any, b: any) => (a.name?.toLowerCase().endsWith(".3mf") ? 0 : 1) - (b.name?.toLowerCase().endsWith(".3mf") ? 0 : 1))
+      ?.[0] ?? null
   ) : null;
   const hasZip = (model.modelFiles as any[] | null)?.some((f: any) => f.name?.toLowerCase().endsWith(".zip"));
 
@@ -117,7 +120,7 @@ function ModelCard({ model, onClick, selectMode = false, isSelected = false, onT
         </div>
       )}
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-        {!imgLoaded && !imgError && !firstStl && <div className="absolute inset-0 shimmer" />}
+        {!imgLoaded && !imgError && !firstViewable && <div className="absolute inset-0 shimmer" />}
         {thumb && !imgError ? (
           <img
             src={thumb}
@@ -126,9 +129,10 @@ function ModelCard({ model, onClick, selectMode = false, isSelected = false, onT
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgError(true)}
           />
-        ) : firstStl ? (
+        ) : firstViewable ? (
           <STLViewer
-            url={firstStl.webContentLink}
+            url={firstViewable.webContentLink}
+            fileType={firstViewable.name?.toLowerCase().endsWith(".3mf") ? "3mf" : "stl"}
             className="w-full h-full"
             bgColor="#0d0d0d"
           />
@@ -598,7 +602,51 @@ export default function Home() {
   // Auto-scan on first load: trigger automatically when the library is genuinely empty.
   // Only fires when the library is configured (has paths set up).
   const autoScanFired = useRef(false);
+  // Bulk thumbnail generation state
+  const [bulkThumbState, setBulkThumbState] = useState<{
+    running: boolean;
+    queue: Array<{ id: number; name: string; fileUrl: string; fileType: "stl" | "3mf" }>;
+    current: number;
+    done: number;
+    failed: number;
+    total: number;
+    currentName: string;
+  } | null>(null);
+  const bulkViewerRef = useRef<STLViewerHandle>(null);
+  const bulkThumbResolveRef = useRef<((loaded: boolean) => void) | null>(null);
   const utils = trpc.useUtils();
+
+  // Bulk thumbnail: save PNG blob for a model
+  const saveThumbnailBlob = async (modelId: number, blob: Blob) => {
+    const resp = await fetch(`/api/save-thumbnail?modelId=${modelId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: blob,
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => resp.statusText);
+      let errMsg = `HTTP ${resp.status}`;
+      try { const p = JSON.parse(text); errMsg = p.error || p.message || errMsg; } catch { errMsg = text.slice(0, 80) || errMsg; }
+      throw new Error(errMsg);
+    }
+    return resp.json();
+  };
+
+  // Start bulk thumbnail generation for all models missing renders that have STL/3MF files
+  const startBulkThumbnails = () => {
+    const queue = (models as any[])
+      .filter((m: any) => m.imageCount === 0)
+      .flatMap((m: any) => {
+        const files: any[] = m.modelFiles || [];
+        const viewable = files
+          .filter((f: any) => (f.name?.toLowerCase().endsWith(".3mf") || f.name?.toLowerCase().endsWith(".stl")) && f.webContentLink)
+          .sort((a: any, b: any) => (a.name?.toLowerCase().endsWith(".3mf") ? 0 : 1) - (b.name?.toLowerCase().endsWith(".3mf") ? 0 : 1));
+        if (!viewable.length) return [];
+        return [{ id: m.id, name: m.name, fileUrl: viewable[0].webContentLink, fileType: (viewable[0].name?.toLowerCase().endsWith(".3mf") ? "3mf" : "stl") as "stl" | "3mf" }];
+      });
+    if (!queue.length) { toast.info("All models already have thumbnails."); return; }
+    setBulkThumbState({ running: true, queue, current: 0, done: 0, failed: 0, total: queue.length, currentName: queue[0]?.name || "" });
+  };
 
   const bulkCreateTagMutation = trpc.tags.create.useMutation({
     onSuccess: (tag) => {
@@ -678,6 +726,46 @@ export default function Home() {
       startScanMutation.mutate();
     }
   }, [isFirstScan, isScanning, modelsLoading, scanStatus, isConfigured]);
+
+  // Bulk thumbnail processing: when bulkThumbState advances, process next item
+  useEffect(() => {
+    if (!bulkThumbState?.running) return;
+    const { queue, current } = bulkThumbState;
+    if (current >= queue.length) {
+      // All done
+      setBulkThumbState((s) => s ? { ...s, running: false } : null);
+      utils.models.list.invalidate();
+      utils.models.recent.invalidate();
+      return;
+    }
+    const item = queue[current];
+    setBulkThumbState((s) => s ? { ...s, currentName: item.name } : null);
+    // Wait for the hidden viewer to signal it's loaded via the resolve ref
+    const timeout = setTimeout(() => {
+      if (bulkThumbResolveRef.current) {
+        bulkThumbResolveRef.current(false); // timed out
+        bulkThumbResolveRef.current = null;
+      }
+    }, 30000); // 30s timeout per model
+    const loadPromise = new Promise<boolean>((resolve) => {
+      bulkThumbResolveRef.current = resolve;
+    });
+    loadPromise.then(async (loaded) => {
+      clearTimeout(timeout);
+      if (!loaded) {
+        setBulkThumbState((s) => s ? { ...s, current: s.current + 1, failed: s.failed + 1 } : null);
+        return;
+      }
+      try {
+        const blob = await bulkViewerRef.current?.captureScreenshot();
+        if (!blob) throw new Error("No canvas data");
+        await saveThumbnailBlob(item.id, blob);
+        setBulkThumbState((s) => s ? { ...s, current: s.current + 1, done: s.done + 1 } : null);
+      } catch {
+        setBulkThumbState((s) => s ? { ...s, current: s.current + 1, failed: s.failed + 1 } : null);
+      }
+    });
+  }, [bulkThumbState?.current, bulkThumbState?.running]);
 
   return (
     <div className="container py-8">
@@ -763,6 +851,17 @@ export default function Home() {
           >
             <Heart className={cn("w-4 h-4", favoritesOnly ? "fill-primary-foreground" : "")} />
           </button>
+
+          {/* Generate All Thumbnails button */}
+          {isAdmin && (
+            <button
+              onClick={startBulkThumbnails}
+              title="Generate thumbnails for all models missing renders"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors bg-secondary text-muted-foreground border-border/50 hover:text-foreground"
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Bulk select toggle */}
           {isAdmin && (
@@ -1029,10 +1128,11 @@ export default function Home() {
             <CarouselContent className="-ml-3">
               {recentModels.map((model) => {
                 const thumb = getModelImageUrl((model as any).images, (model as any).heroImage, 400);
-                const firstStl = !thumb
-                  ? (model.modelFiles as any[] | null)?.find(
-                      (f: any) => f.name?.toLowerCase().endsWith(".stl") && f.webContentLink
-                    )
+                const firstViewable = !thumb
+                  ? (model.modelFiles as any[] | null)
+                      ?.filter((f: any) => (f.name?.toLowerCase().endsWith(".3mf") || f.name?.toLowerCase().endsWith(".stl")) && f.webContentLink)
+                      ?.sort((a: any, b: any) => (a.name?.toLowerCase().endsWith(".3mf") ? 0 : 1) - (b.name?.toLowerCase().endsWith(".3mf") ? 0 : 1))
+                      ?.[0] ?? null
                   : null;
                 return (
                   <CarouselItem key={model.id} className="pl-3 basis-36 sm:basis-44">
@@ -1048,8 +1148,8 @@ export default function Home() {
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                           />
-                        ) : firstStl ? (
-                          <STLViewer url={firstStl.webContentLink} className="w-full h-full" />
+                        ) : firstViewable ? (
+                          <STLViewer url={firstViewable.webContentLink} fileType={firstViewable.name?.toLowerCase().endsWith(".3mf") ? "3mf" : "stl"} className="w-full h-full" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <Box className="w-8 h-8 text-muted-foreground/30" />
@@ -1178,6 +1278,54 @@ export default function Home() {
 
       {/* Grouped by category */}
       {!modelsLoading && grouped && <CategoryGallery groups={grouped} onNavigate={navigate} onViewAll={setSelectedCategory} isAdmin={isAdmin} selectMode={bulkMode} selectedModels={selectedModels} onToggleSelect={toggleModelSelection} />}
+
+      {/* Hidden STLViewer for bulk thumbnail generation */}
+      {bulkThumbState?.running && bulkThumbState.current < bulkThumbState.queue.length && (
+        <div style={{ position: "fixed", left: -9999, top: -9999, width: 512, height: 512, pointerEvents: "none", opacity: 0 }}>
+          <STLViewer
+            ref={bulkViewerRef}
+            url={bulkThumbState.queue[bulkThumbState.current]?.fileUrl}
+            fileType={bulkThumbState.queue[bulkThumbState.current]?.fileType}
+            className="w-full h-full"
+            bgColor="#0d0d0d"
+            onLoaded={() => {
+              if (bulkThumbResolveRef.current) {
+                bulkThumbResolveRef.current(true);
+                bulkThumbResolveRef.current = null;
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* Bulk thumbnail progress dialog */}
+      {bulkThumbState && (
+        <div className="fixed bottom-6 right-6 z-50 w-80 bg-card border border-border rounded-xl shadow-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">
+                {bulkThumbState.running ? "Generating Thumbnails…" : "Thumbnails Complete"}
+              </span>
+            </div>
+            {!bulkThumbState.running && (
+              <button onClick={() => setBulkThumbState(null)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground mb-2 truncate">
+            {bulkThumbState.running ? `Processing: ${bulkThumbState.currentName}` : `Done — ${bulkThumbState.done} saved, ${bulkThumbState.failed} skipped`}
+          </div>
+          <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-300"
+              style={{ width: `${Math.round(((bulkThumbState.done + bulkThumbState.failed) / bulkThumbState.total) * 100)}%` }}
+            />
+          </div>
+          <div className="text-xs text-muted-foreground mt-1.5 text-right">
+            {bulkThumbState.done + bulkThumbState.failed} / {bulkThumbState.total}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

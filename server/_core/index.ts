@@ -276,7 +276,8 @@ async function startServer() {
       if (db) {
         const { models } = await import("../../drizzle/schema");
         const { eq } = await import("drizzle-orm");
-        const imgs: any[] = JSON.parse((model.images as any) ?? "[]");
+        // model.images is already a parsed array (Drizzle uses mode:"json")
+        const imgs: any[] = Array.isArray(model.images) ? [...(model.images as any[])] : [];
         imgs.unshift({
           fileId: `generated_thumb_${Date.now()}`,
           name: fileName,
