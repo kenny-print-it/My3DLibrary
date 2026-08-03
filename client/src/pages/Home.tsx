@@ -7,7 +7,7 @@ import {
   Search, Filter, X, Heart, Box, FolderOpen, RefreshCw,
   ArrowUpDown, CheckCheck, ChevronDown, ChevronRight,
   GripVertical, LayoutList, Settings, Archive,
-  CheckSquare, Square, Tags, Plus,
+  CheckSquare, Square, Tags, Plus, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +15,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import Autoplay from "embla-carousel-autoplay";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 import { Clock } from "lucide-react";
-import STLViewer from "@/components/STLViewer";
+import STLViewer, { type STLViewerHandle } from "@/components/STLViewer";
 import {
   DndContext,
   closestCenter,
