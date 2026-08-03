@@ -288,7 +288,7 @@ async function startServer() {
           mimeType: "image/png",
         });
         await db.update(models)
-          .set({ images: JSON.stringify(imgs) as any, imageCount: imgs.length })
+          .set({ images: imgs as any, imageCount: imgs.length })
           .where(eq(models.id, modelId));
       }
 
