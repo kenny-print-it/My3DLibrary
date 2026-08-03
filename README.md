@@ -17,6 +17,7 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 - **View** models in a built-in interactive 3D viewer — supports both **STL and 3MF** files
 - **Multi-file viewer** — when a model has multiple STL/3MF files, a file selector strip lets you switch between them instantly
 - **Generate Thumbnail** — capture a thumbnail from the 3D viewer with one click; auto-orients to a hero angle or captures your current rotation. A bulk ✦ button generates thumbnails for every model missing renders in one pass
+- **Retake Thumbnail** — hover over any model image and click "Retake Thumbnail" to re-orient the 3D viewer and capture a replacement thumbnail
 - **Auto-tag** models using local AI (Ollama) or free cloud AI (Groq) — no subscription required
 - **AI Setup Guide** — interactive wizard with one-click auto-fill for all AI provider settings
 - **Search** by name, tag, or collection
@@ -90,6 +91,16 @@ The **✦ (sparkle) button** in the Library toolbar generates thumbnails for eve
 - 3MF files are prioritised over STL when both are present
 - A 30-second timeout per model prevents stalling on very large files
 - The library refreshes automatically when complete
+
+### Retake Thumbnail
+
+If the auto-generated thumbnail isn't the angle you want, you can replace it at any time (owner only):
+
+1. Open the model detail page
+2. Hover over the image — a **"Retake Thumbnail"** button appears in the bottom-right corner
+3. Click it to switch to the 3D viewer in **Retake mode**
+4. Rotate the model to the angle you prefer (and switch between STL/3MF files if needed)
+5. Click **"Capture New Thumbnail"** to save the new view, or **"Cancel"** to go back
 
 ---
 

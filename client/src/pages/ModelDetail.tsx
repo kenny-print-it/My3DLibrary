@@ -79,6 +79,8 @@ export default function ModelDetail() {
   const [viewerFileIdx, setViewerFileIdx] = useState(0);
   // Thumbnail generation state
   const [thumbGenProgress, setThumbGenProgress] = useState<number | null>(null);
+  // Retake thumbnail mode: show 3D viewer even when images exist so user can re-orient and capture
+  const [retakeThumbnail, setRetakeThumbnail] = useState(false);
   // Ref to the STLViewer for screenshot capture
   const viewerRef = useRef<STLViewerHandle>(null);
   const [confirmDeleteModel, setConfirmDeleteModel] = useState(false);
@@ -334,19 +336,17 @@ export default function ModelDetail() {
   const images: any[] = heroIdx > 0
     ? [rawImages[heroIdx], ...rawImages.filter((_, i) => i !== heroIdx)]
     : rawImages;
-  // All viewable 3D files (STL + 3MF) for the viewer fallback (only shown when no images exist)
+  // All viewable 3D files (STL + 3MF) — always computed, used for viewer fallback and retake thumbnail
   // 3MF files are prioritized over STL files
-  const viewableFiles: any[] = images.length === 0
-    ? ((model.modelFiles as any[] | null) || [])
-        .filter((f: any) =>
-          (f.name?.toLowerCase().endsWith(".stl") || f.name?.toLowerCase().endsWith(".3mf")) && f.webContentLink
-        )
-        .sort((a: any, b: any) => {
-          const a3mf = a.name?.toLowerCase().endsWith(".3mf") ? 0 : 1;
-          const b3mf = b.name?.toLowerCase().endsWith(".3mf") ? 0 : 1;
-          return a3mf - b3mf;
-        })
-    : [];
+  const viewableFiles: any[] = ((model.modelFiles as any[] | null) || [])
+    .filter((f: any) =>
+      (f.name?.toLowerCase().endsWith(".stl") || f.name?.toLowerCase().endsWith(".3mf")) && f.webContentLink
+    )
+    .sort((a: any, b: any) => {
+      const a3mf = a.name?.toLowerCase().endsWith(".3mf") ? 0 : 1;
+      const b3mf = b.name?.toLowerCase().endsWith(".3mf") ? 0 : 1;
+      return a3mf - b3mf;
+    });
   const rawFiles: any[] = model.modelFiles as any[] || [];
 
   // Prioritize: docs/PDFs/instructions first, then images, then 3D model files
@@ -501,9 +501,17 @@ export default function ModelDetail() {
           <div
             ref={carouselRef}
             className="relative aspect-[4/3] rounded-xl overflow-hidden bg-muted cursor-pointer group"
-            onClick={() => images.length > 0 && setLightbox(true)}
+            onClick={() => !retakeThumbnail && images.length > 0 && setLightbox(true)}
           >
-            {images.length > 0 ? (
+            {retakeThumbnail && viewableFiles.length > 0 ? (
+              <STLViewer
+                ref={viewerRef}
+                url={viewableFiles[viewerFileIdx]?.webContentLink}
+                fileType={viewableFiles[viewerFileIdx]?.name?.toLowerCase().endsWith(".3mf") ? "3mf" : "stl"}
+                className="w-full h-full"
+                bgColor="#0d0d0d"
+              />
+            ) : images.length > 0 ? (
               <img
                 src={localImageUrl(images[activeImg]) || ""}
                 alt={images[activeImg]?.name}
@@ -523,8 +531,8 @@ export default function ModelDetail() {
                 <span className="text-sm opacity-50">No render images available</span>
               </div>
             )}
-            {/* Hero image badge */}
-            {images.length > 0 && activeImg === 0 && heroImageUrl && (
+            {/* Hero image badge — hidden in retake mode */}
+            {!retakeThumbnail && images.length > 0 && activeImg === 0 && heroImageUrl && (
               <div className="absolute top-3 left-3 flex items-center gap-2">
                 <div className="flex items-center gap-1 bg-amber-500/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full">
                   <Star className="w-3 h-3 fill-black" /> Hero
@@ -540,9 +548,31 @@ export default function ModelDetail() {
                 )}
               </div>
             )}
+            {/* Retake Thumbnail button — owner only, shown when images exist AND viewable 3D files exist */}
+            {!retakeThumbnail && isOwner && images.length > 0 && viewableFiles.length > 0 && (
+              <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setRetakeThumbnail(true); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/70 text-white text-xs font-medium hover:bg-black/90 transition-colors backdrop-blur-sm"
+                  title="Re-orient the 3D model and capture a new thumbnail"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Retake Thumbnail
+                </button>
+              </div>
+            )}
+            {/* Retake mode overlay hint */}
+            {retakeThumbnail && (
+              <div className="absolute top-3 left-3">
+                <div className="flex items-center gap-1.5 bg-amber-500/90 text-black text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <Sparkles className="w-3 h-3" />
+                  Retake mode — rotate to desired angle
+                </div>
+              </div>
+            )}
 
-            {/* Nav arrows */}
-            {images.length > 1 && (
+            {/* Nav arrows — hidden in retake mode */}
+            {!retakeThumbnail && images.length > 1 && (
               <>
                 <button onClick={(e) => { e.stopPropagation(); prevImg(); }} className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80">
                   <ChevronLeft className="w-4 h-4" />
@@ -558,16 +588,17 @@ export default function ModelDetail() {
               </>
             )}
 
-            {images.length > 0 && (
+            {!retakeThumbnail && images.length > 0 && (
               <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                 <span className="text-xs bg-black/60 text-white px-2 py-1 rounded-full backdrop-blur-sm">{activeImg + 1} / {images.length}</span>
               </div>
             )}
           </div>
 
-          {/* Generate Thumbnail button — shown when there are no images but viewable 3D files */}
-          {images.length === 0 && viewableFiles.length > 0 && isOwner && (
+          {/* Generate Thumbnail / Retake Thumbnail action bar */}
+          {viewableFiles.length > 0 && isOwner && (images.length === 0 || retakeThumbnail) && (
             <div className="flex items-center gap-3">
+              {/* Capture button (used in both initial generate and retake modes) */}
               <button
                 onClick={async () => {
                   if (thumbGenProgress !== null) return;
@@ -584,8 +615,9 @@ export default function ModelDetail() {
                     setThumbGenProgress(100);
                     utils.models.get.invalidate({ id: modelId });
                     utils.models.list.invalidate();
-                    toast.success("Thumbnail saved! It will now appear on the library card.");
+                    toast.success(retakeThumbnail ? "Thumbnail updated!" : "Thumbnail saved! It will now appear on the library card.");
                     setThumbGenProgress(null);
+                    setRetakeThumbnail(false);
                   } catch (err: any) {
                     toast.error(`Thumbnail generation failed: ${err.message}`);
                     setThumbGenProgress(null);
@@ -597,7 +629,12 @@ export default function ModelDetail() {
                 {thumbGenProgress !== null ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Generating… {thumbGenProgress}%</span>
+                    <span>Saving… {thumbGenProgress}%</span>
+                  </>
+                ) : retakeThumbnail ? (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Capture New Thumbnail</span>
                   </>
                 ) : (
                   <>
@@ -606,6 +643,16 @@ export default function ModelDetail() {
                   </>
                 )}
               </button>
+              {/* Cancel button — only shown in retake mode */}
+              {retakeThumbnail && thumbGenProgress === null && (
+                <button
+                  onClick={() => setRetakeThumbnail(false)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border/50 text-muted-foreground text-sm font-medium hover:text-foreground hover:border-border transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+              )}
               {thumbGenProgress !== null && (
                 <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                   <div
@@ -617,8 +664,8 @@ export default function ModelDetail() {
             </div>
           )}
 
-          {/* 3D file selector — shown when there are multiple viewable files and no images */}
-          {images.length === 0 && viewableFiles.length > 1 && (
+          {/* 3D file selector — shown when there are multiple viewable files and no images, or in retake mode */}
+          {(images.length === 0 || retakeThumbnail) && viewableFiles.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {viewableFiles.map((f, i) => {
                 const ext = f.name?.split(".").pop()?.toUpperCase() || "";

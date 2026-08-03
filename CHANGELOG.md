@@ -25,6 +25,9 @@ The library card updates automatically — no rescan needed. If you rotate the m
 **Bulk thumbnail generation**
 A sparkle (✦) button in the Library toolbar (owner only) generates thumbnails for every model that has no render images but has at least one STL or 3MF file. A progress card in the bottom-right shows which model is being processed and the overall count. A 30-second timeout per model prevents the process from stalling on complex files.
 
+**Retake Thumbnail**
+Models that already have a generated thumbnail can now have it replaced. When viewing a model that has render images *and* at least one STL or 3MF file, hovering over the image reveals a **"Retake Thumbnail"** button in the bottom-right corner (owner only). Clicking it switches the main display to the interactive 3D viewer, shows a "Retake mode — rotate to desired angle" banner, and replaces the Generate Thumbnail button with **"Capture New Thumbnail"** and **"Cancel"** buttons. The file selector strip also appears so you can switch between STL/3MF files. Clicking Capture saves the current view as the new thumbnail and exits retake mode automatically.
+
 **AI Setup Guide auto-fill**
 Each option card in the AI Setup Guide (Settings → AI) is now interactive. Clicking an option expands it to show setup instructions, and a "Use This Option — Auto-fill Settings" button at the bottom closes the guide, fills in the API URL and model fields automatically, and puts the settings form into edit mode. A toast prompts you to add your API key if needed before saving.
 
