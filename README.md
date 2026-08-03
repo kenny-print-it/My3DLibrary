@@ -16,7 +16,7 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 - **Browse** your collection by collection and category with thumbnail previews
 - **View** models in a built-in interactive 3D viewer — supports both **STL and 3MF** files
 - **Multi-file viewer** — when a model has multiple STL/3MF files, a file selector strip lets you switch between them instantly
-- **Generate Thumbnail** — automatically render a thumbnail from any STL or 3MF file with one click; the app samples 28 camera angles and picks the best view
+- **Generate Thumbnail** — capture a thumbnail from the 3D viewer with one click; auto-orients to a hero angle or captures your current rotation. A bulk ✦ button generates thumbnails for every model missing renders in one pass
 - **Auto-tag** models using local AI (Ollama) or free cloud AI (Groq) — no subscription required
 - **AI Setup Guide** — interactive wizard with one-click auto-fill for all AI provider settings
 - **Search** by name, tag, or collection
@@ -45,7 +45,7 @@ Just unzip and double-click `My3DLibrary.exe`. That's it.
 
 ## Quick Start
 
-1. Download and unzip `My3DLibrary-Windows-v1.2-Beta-build4.zip`
+1. Download and unzip `My3DLibrary-Windows-v1.2-Beta-build9.zip`
 2. Double-click `My3DLibrary.exe`
 3. Your browser opens automatically at `http://localhost:3000`
 4. Go to **Settings → Library**, click **Add Folder**, and point it at your models folder
@@ -72,14 +72,24 @@ If a model folder contains more than one STL or 3MF file, a **file selector stri
 
 ### Generate Thumbnail
 
-When a model has no render images but has an STL or 3MF file, a **"Generate Thumbnail"** button appears below the viewer.
+When a model has no render images but has an STL or 3MF file, a **"Generate Thumbnail"** button appears below the viewer (owner only).
 
 Clicking it:
-1. Samples **28 camera angles** distributed evenly around the model
-2. Picks the angle that shows the most geometry (maximises visible surface area)
-3. Renders a high-quality **512×512 PNG** with anti-aliasing
-4. Saves the PNG directly into the model's folder on disk
-5. Sets it as the hero image on the library card — no rescan needed
+1. Snaps the camera to a classic 3/4 front-left elevated hero angle (if you haven't manually rotated the model)
+2. Captures the visible Three.js canvas as a **512×512 PNG**
+3. Saves the PNG directly into the model's folder on disk
+4. Sets it as the hero image on the library card — no rescan needed
+
+> **Tip:** Rotate the model to any angle you prefer before clicking — the button captures exactly what's on screen.
+
+### Bulk Thumbnail Generation
+
+The **✦ (sparkle) button** in the Library toolbar generates thumbnails for every model that has no render images but has at least one STL or 3MF file.
+
+- A progress card in the bottom-right shows which model is being processed
+- 3MF files are prioritised over STL when both are present
+- A 30-second timeout per model prevents stalling on very large files
+- The library refreshes automatically when complete
 
 ---
 

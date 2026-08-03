@@ -4,9 +4,29 @@ All notable changes to My3DLibrary are documented here.
 
 ---
 
-## [v1.2.0-beta] — 2026-07-31
+## [v1.2.0-beta] — 2026-08-03
 
 ### New Features
+
+**3MF 3D viewer support**
+The built-in interactive viewer now supports both STL and 3MF files. When a model has no render images, the viewer automatically selects the best available 3D file to display. 3MF files are prioritised over STL files when both are present. The 3MF parser uses fflate to unzip the archive in the browser, parses the XML geometry, and builds a Three.js BufferGeometry with computed normals.
+
+**Multi-file viewer selector**
+When a model has more than one viewable STL or 3MF file, a file selector strip appears below the viewer. Each entry shows the filename and a colour-coded badge (amber for STL, blue for 3MF). Clicking any entry instantly swaps the viewer to that file. The selection resets to the first file when navigating to a different model.
+
+**Generate Thumbnail**
+A "Generate Thumbnail" button appears below the 3D viewer on model detail pages when the model has no render images (owner only). Clicking it:
+1. Snaps the camera to a classic 3/4 front-left elevated hero angle (if you have not manually rotated the model)
+2. Captures the visible Three.js canvas as a 512×512 PNG
+3. Saves the PNG into the model's folder on disk
+4. Registers it as the model's hero image immediately
+The library card updates automatically — no rescan needed. If you rotate the model first, the button captures whatever angle is currently shown.
+
+**Bulk thumbnail generation**
+A sparkle (✦) button in the Library toolbar (owner only) generates thumbnails for every model that has no render images but has at least one STL or 3MF file. A progress card in the bottom-right shows which model is being processed and the overall count. A 30-second timeout per model prevents the process from stalling on complex files.
+
+**AI Setup Guide auto-fill**
+Each option card in the AI Setup Guide (Settings → AI) is now interactive. Clicking an option expands it to show setup instructions, and a "Use This Option — Auto-fill Settings" button at the bottom closes the guide, fills in the API URL and model fields automatically, and puts the settings form into edit mode. A toast prompts you to add your API key if needed before saving.
 
 **Print Settings card on model detail**
 A new "Recommended Print Settings" card has been added to the model detail page, positioned above the Notes section. It lets you record Material, Layer Height, Infill Density, Infill Pattern, and Support recommendation for each model. When Support is set to "No", the Support Spacing and Support Interface Layers fields automatically collapse. Settings are saved per-model and persist across app restarts.
