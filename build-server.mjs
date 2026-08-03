@@ -68,3 +68,16 @@ console.log("📂 Copying slim node_modules for packaging...");
 execSync(`rm -rf "${slimDst}" && cp -r "${slimSrc}" "${slimDst}"`, { stdio: "inherit" });
 console.log("✅ node_modules_dist ready");
 
+// Sync built bundle + public assets to printlib-portable/dist for packaging scripts
+const portableDist = "/home/ubuntu/printlib-portable/dist";
+if (existsSync(portableDist)) {
+  cpSync(resolve(root, "dist/index.js"), resolve(portableDist, "index.js"));
+  // Also sync the Vite-built public assets (frontend bundle)
+  const srcPublic = resolve(root, "dist/public");
+  if (existsSync(srcPublic)) {
+    cpSync(srcPublic, resolve(portableDist, "public"), { recursive: true });
+    console.log("✅ Synced dist/public to printlib-portable/dist");
+  }
+  console.log("✅ Synced dist/index.js to printlib-portable/dist");
+}
+

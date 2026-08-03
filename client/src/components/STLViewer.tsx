@@ -1,24 +1,27 @@
 /**
  * STLViewer.tsx
  *
- * Inline Three.js STL viewer for model cards and detail pages.
- * Loads an STL file from a URL (Google Drive webContentLink) and renders it
- * in a canvas with orbit controls (mouse drag to rotate, scroll to zoom).
+ * Inline Three.js 3D viewer for model cards and detail pages.
+ * Supports STL (binary + ASCII) and 3MF files.
+ *
+ * 3MF files are ZIP archives — we unzip them in the browser using fflate,
+ * then parse the XML geometry (3dmodel.model) and build a BufferGeometry.
  *
  * Usage:
- *   <STLViewer url="https://..." className="w-full h-48" />
+ *   <STLViewer url="https://..." fileType="stl" className="w-full h-48" />
+ *   <STLViewer url="https://..." fileType="3mf" className="w-full h-48" />
  */
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
 
-// Minimal STL parser (binary + ASCII) — avoids importing the full STLLoader
-// which requires a separate import path in some three.js versions.
+// ---------------------------------------------------------------------------
+// STL parser (binary + ASCII)
+// ---------------------------------------------------------------------------
 function parseSTL(buffer: ArrayBuffer): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
 
-  // Try binary first (binary STL starts with 80-byte header + uint32 triangle count)
   const view = new DataView(buffer);
   const numTriangles = view.getUint32(80, true);
   const expectedSize = 84 + numTriangles * 50;
@@ -73,15 +76,88 @@ function parseSTL(buffer: ArrayBuffer): THREE.BufferGeometry {
   return geometry;
 }
 
+// ---------------------------------------------------------------------------
+// 3MF parser — unzip with fflate, parse XML geometry
+// ---------------------------------------------------------------------------
+async function parse3MF(buffer: ArrayBuffer): Promise<THREE.BufferGeometry> {
+  // Dynamically import fflate so it's code-split and only loaded when needed
+  const { unzipSync } = await import("fflate");
+
+  const uint8 = new Uint8Array(buffer);
+  const files = unzipSync(uint8);
+
+  // Find the 3D model file — typically 3D/3dmodel.model or similar
+  let modelXml: string | null = null;
+  for (const name of Object.keys(files)) {
+    if (name.toLowerCase().endsWith(".model")) {
+      modelXml = new TextDecoder().decode(files[name]);
+      break;
+    }
+  }
+
+  if (!modelXml) {
+    throw new Error("No .model file found inside 3MF archive");
+  }
+
+  // Parse XML
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(modelXml, "text/xml");
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  // Collect all <vertices> and <triangles> from all <object> elements
+  const objects = doc.querySelectorAll("object");
+  for (const obj of Array.from(objects)) {
+    const vertexEls = obj.querySelectorAll("vertex");
+    const triEls = obj.querySelectorAll("triangle");
+
+    if (vertexEls.length === 0 || triEls.length === 0) continue;
+
+    const baseIndex = positions.length / 3;
+
+    for (const v of Array.from(vertexEls)) {
+      positions.push(
+        parseFloat(v.getAttribute("x") || "0"),
+        parseFloat(v.getAttribute("y") || "0"),
+        parseFloat(v.getAttribute("z") || "0")
+      );
+    }
+
+    for (const t of Array.from(triEls)) {
+      indices.push(
+        baseIndex + parseInt(t.getAttribute("v1") || "0", 10),
+        baseIndex + parseInt(t.getAttribute("v2") || "0", 10),
+        baseIndex + parseInt(t.getAttribute("v3") || "0", 10)
+      );
+    }
+  }
+
+  if (positions.length === 0) {
+    throw new Error("No geometry found in 3MF model");
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 interface STLViewerProps {
-  /** Direct download URL for the STL file */
+  /** Direct download URL for the STL or 3MF file */
   url: string;
+  /** File type — "stl" (default) or "3mf" */
+  fileType?: "stl" | "3mf";
   className?: string;
   /** Background color (CSS string). Defaults to transparent/dark. */
   bgColor?: string;
 }
 
-export default function STLViewer({ url, className, bgColor = "#111" }: STLViewerProps) {
+export default function STLViewer({ url, fileType = "stl", className, bgColor = "#111" }: STLViewerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +168,7 @@ export default function STLViewer({ url, className, bgColor = "#111" }: STLViewe
 
     let animId: number;
     let renderer: THREE.WebGLRenderer | null = null;
+    let cancelled = false;
 
     const width = el.clientWidth || 300;
     const height = el.clientHeight || 300;
@@ -170,14 +247,16 @@ export default function STLViewer({ url, className, bgColor = "#111" }: STLViewe
 
     let mesh: THREE.Mesh | null = null;
 
-    // Load STL
+    // Load and parse the file
     fetch(url)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.arrayBuffer();
       })
-      .then((buf) => {
-        const geo = parseSTL(buf);
+      .then(async (buf) => {
+        if (cancelled) return;
+        const geo = fileType === "3mf" ? await parse3MF(buf) : parseSTL(buf);
+        if (cancelled) return;
         geo.computeBoundingBox();
         const box = geo.boundingBox!;
         const center = new THREE.Vector3();
@@ -194,8 +273,9 @@ export default function STLViewer({ url, className, bgColor = "#111" }: STLViewe
         setLoading(false);
       })
       .catch((err) => {
+        if (cancelled) return;
         console.warn("[STLViewer] Load error:", err);
-        setError("Could not load STL");
+        setError(`Could not load ${fileType.toUpperCase()}`);
         setLoading(false);
       });
 
@@ -212,6 +292,7 @@ export default function STLViewer({ url, className, bgColor = "#111" }: STLViewe
     animate();
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(animId);
       el.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mousemove", onMouseMove);
@@ -225,7 +306,7 @@ export default function STLViewer({ url, className, bgColor = "#111" }: STLViewe
         el.removeChild(renderer.domElement);
       }
     };
-  }, [url, bgColor]);
+  }, [url, fileType, bgColor]);
 
   return (
     <div className={cn("relative overflow-hidden", className)}>

@@ -14,6 +14,7 @@
 import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
+import { extract3mfThumbnail, save3mfThumbnail } from "./3mfThumbnail";
 
 const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff"]);
 const MODEL_EXTS = new Set([".stl", ".3mf", ".obj", ".step", ".stp", ".iges", ".igs", ".fcstd", ".blend", ".f3d", ".amf"]);
@@ -256,7 +257,27 @@ export async function scanLocalLibrary(
         modelsFound,
       });
       const files = await collectFilesInFolder(modelFolderPath, libraryRoot);
-      const images = files.filter(f => f.isImage);
+      let images = files.filter(f => f.isImage);
+      // If no images, try to extract embedded thumbnail from a .3mf file
+      if (images.length === 0) {
+        const threemfFile = files.find(f => f.name.toLowerCase().endsWith(".3mf"));
+        if (threemfFile) {
+          try {
+            const absPath = path.join(libraryRoot, threemfFile.relativePath);
+            const thumb = await extract3mfThumbnail(absPath);
+            if (thumb) {
+              const savedPath = await save3mfThumbnail(absPath, thumb);
+              if (savedPath) {
+                const relSaved = path.relative(libraryRoot, savedPath).replace(/\\/g, "/");
+                const thumbExt = path.extname(savedPath).toLowerCase();
+                const newFile: ScannedFile = { name: path.basename(savedPath), relativePath: relSaved, size: thumb.buffer.length, mimeType: thumb.mimeType, isImage: true, isModel: false };
+                files.push(newFile);
+                images = [newFile];
+              }
+            }
+          } catch { /* ignore extraction errors */ }
+        }
+      }
       collectionMap.get(collPath)!.models.push({
         localId: relativePath,
         name: modelName,
@@ -310,7 +331,26 @@ export async function scanLocalLibrary(
           modelsFound,
         });
         const files = await collectFilesInFolder(modelFolderPath, libraryRoot);
-        const images = files.filter(f => f.isImage);
+        let images = files.filter(f => f.isImage);
+        // If no images, try to extract embedded thumbnail from a .3mf file
+        if (images.length === 0) {
+          const threemfFile = files.find(f => f.name.toLowerCase().endsWith(".3mf"));
+          if (threemfFile) {
+            try {
+              const absPath = path.join(libraryRoot, threemfFile.relativePath);
+              const thumb = await extract3mfThumbnail(absPath);
+              if (thumb) {
+                const savedPath = await save3mfThumbnail(absPath, thumb);
+                if (savedPath) {
+                  const relSaved = path.relative(libraryRoot, savedPath).replace(/\\/g, "/");
+                  const newFile: ScannedFile = { name: path.basename(savedPath), relativePath: relSaved, size: thumb.buffer.length, mimeType: thumb.mimeType, isImage: true, isModel: false };
+                  files.push(newFile);
+                  images = [newFile];
+                }
+              }
+            } catch { /* ignore extraction errors */ }
+          }
+        }
         collectionMap.get(collPath)!.models.push({
           localId: relativePath,
           name: modelName,

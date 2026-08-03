@@ -3,10 +3,11 @@ import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Heart, ExternalLink, Download, Box, ChevronLeft, ChevronRight,
   Tag, Plus, X, Pencil, Check, FolderOpen, FileBox, Archive, FileText, File, Star, Settings2,
-  Search, ArrowUpDown, ChevronDown, ChevronUp, Package, Link, Trash2
+  Search, ArrowUpDown, ChevronDown, ChevronUp, Package, Link, Trash2, Sparkles, Loader2
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import STLViewer from "@/components/STLViewer";
+import { generateThumbnail } from "@/lib/generateThumbnail";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,6 +44,7 @@ export default function ModelDetail() {
     setFileSortBy("default");
     setFileTypeFilter(null);
     setExpandedZips(new Set());
+    setViewerFileIdx(0);
   }, [modelId]);
 
   // Track scroll position to show/hide sticky title bar
@@ -74,6 +76,10 @@ export default function ModelDetail() {
   // Inline rename state: { fileId, fileType, value }
   const [renamingFile, setRenamingFile] = useState<{ fileId: string; fileType: "image" | "model"; value: string } | null>(null);
   const [deletingFile, setDeletingFile] = useState<{ fileId: string; fileType: "image" | "model"; name: string } | null>(null);
+  // 3D viewer file selector index (when multiple STL/3MF files exist and no images)
+  const [viewerFileIdx, setViewerFileIdx] = useState(0);
+  // Thumbnail generation state
+  const [thumbGenProgress, setThumbGenProgress] = useState<number | null>(null);
   const [confirmDeleteModel, setConfirmDeleteModel] = useState(false);
   const { user } = useAuth();
   const isOwner = !!(user?.role === "admin" || user?.openId === (window as any).__OWNER_OPEN_ID);
@@ -226,6 +232,21 @@ export default function ModelDetail() {
     onError: (err) => toast.error(`Failed to delete model: ${err.message}`),
   });
 
+  // saveThumbnail uses a direct fetch to /api/save-thumbnail (raw binary POST)
+  // instead of tRPC to avoid tRPC's internal body-size limit that truncates large payloads.
+  const saveThumbnailBlob = async (blob: Blob) => {
+    const resp = await fetch(`/api/save-thumbnail?modelId=${modelId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: blob,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    return resp.json() as Promise<{ success: boolean; imageUrl: string; fileName: string }>;
+  };
+
   // Carousel wheel scroll — must be declared before any early returns (Rules of Hooks)
   const carouselRef = useRef<HTMLDivElement>(null);
   const imagesLengthRef = useRef(0);
@@ -303,10 +324,12 @@ export default function ModelDetail() {
   const images: any[] = heroIdx > 0
     ? [rawImages[heroIdx], ...rawImages.filter((_, i) => i !== heroIdx)]
     : rawImages;
-  // First STL for viewer fallback
-  const firstStlFile = images.length === 0
-    ? (model.modelFiles as any[] | null)?.find((f: any) => f.name?.toLowerCase().endsWith(".stl") && f.webContentLink) ?? null
-    : null;
+  // All viewable 3D files (STL + 3MF) for the viewer fallback (only shown when no images exist)
+  const viewableFiles: any[] = images.length === 0
+    ? ((model.modelFiles as any[] | null) || []).filter((f: any) =>
+        (f.name?.toLowerCase().endsWith(".stl") || f.name?.toLowerCase().endsWith(".3mf")) && f.webContentLink
+      )
+    : [];
   const rawFiles: any[] = model.modelFiles as any[] || [];
 
   // Prioritize: docs/PDFs/instructions first, then images, then 3D model files
@@ -469,8 +492,13 @@ export default function ModelDetail() {
                 alt={images[activeImg]?.name}
                 className="w-full h-full object-contain bg-muted"
               />
-            ) : firstStlFile ? (
-              <STLViewer url={firstStlFile.webContentLink} className="w-full h-full" bgColor="#0d0d0d" />
+            ) : viewableFiles.length > 0 ? (
+              <STLViewer
+                url={viewableFiles[viewerFileIdx]?.webContentLink}
+                fileType={viewableFiles[viewerFileIdx]?.name?.toLowerCase().endsWith(".3mf") ? "3mf" : "stl"}
+                className="w-full h-full"
+                bgColor="#0d0d0d"
+              />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
                 <Box className="w-16 h-16 opacity-20" />
@@ -518,6 +546,90 @@ export default function ModelDetail() {
               </div>
             )}
           </div>
+
+          {/* Generate Thumbnail button — shown when there are no images but viewable 3D files */}
+          {images.length === 0 && viewableFiles.length > 0 && isOwner && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={async () => {
+                  if (thumbGenProgress !== null) return;
+                  const file = viewableFiles[viewerFileIdx];
+                  if (!file?.webContentLink) return;
+                  try {
+                    setThumbGenProgress(0);
+                    const blob = await generateThumbnail({
+                      url: file.webContentLink,
+                      fileType: file.name?.toLowerCase().endsWith(".3mf") ? "3mf" : "stl",
+                      size: 512,
+                      candidates: 28,
+                      onProgress: (p) => setThumbGenProgress(Math.round(p * 100)),
+                    });
+                    // POST raw PNG bytes directly to avoid tRPC body-size limits
+                    await saveThumbnailBlob(blob);
+                    utils.models.get.invalidate({ id: modelId });
+                    utils.models.list.invalidate();
+                    toast.success("Thumbnail saved! It will now appear on the library card.");
+                    setThumbGenProgress(null);
+                  } catch (err: any) {
+                    toast.error(`Thumbnail generation failed: ${err.message}`);
+                    setThumbGenProgress(null);
+                  }
+                }}
+                disabled={thumbGenProgress !== null}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/30 text-primary text-sm font-medium hover:bg-primary/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {thumbGenProgress !== null ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Generating… {thumbGenProgress}%</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Generate Thumbnail</span>
+                  </>
+                )}
+              </button>
+              {thumbGenProgress !== null && (
+                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    style={{ width: `${thumbGenProgress}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3D file selector — shown when there are multiple viewable files and no images */}
+          {images.length === 0 && viewableFiles.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {viewableFiles.map((f, i) => {
+                const ext = f.name?.split(".").pop()?.toUpperCase() || "";
+                const label = f.name?.length > 22 ? f.name.slice(0, 20) + "…" : f.name;
+                return (
+                  <button
+                    key={f.fileId || f.name}
+                    onClick={() => setViewerFileIdx(i)}
+                    className={cn(
+                      "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all",
+                      i === viewerFileIdx
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/50 bg-card text-muted-foreground hover:text-foreground hover:border-border"
+                    )}
+                    title={f.name}
+                  >
+                    <FileBox className="w-3.5 h-3.5 shrink-0" />
+                    <span>{label}</span>
+                    <span className={cn(
+                      "text-[10px] font-semibold px-1 py-0.5 rounded",
+                      ext === "3MF" ? "bg-blue-500/20 text-blue-400" : "bg-amber-500/20 text-amber-400"
+                    )}>{ext}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Thumbnail strip */}
           {images.length > 0 && (

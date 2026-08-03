@@ -3,6 +3,19 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+// Resolve the better-sqlite3 native .node addon explicitly.
+// This bypasses the `bindings` package which fails when the app runs from
+// a non-standard path (e.g. macOS ~/Library/Application Support).
+// Note: `require` is injected by the esbuild banner (createRequire(import.meta.url))
+function getNativeBinding(): string | undefined {
+  try {
+    const pkgJson = require.resolve("better-sqlite3/package.json");
+    const pkgDir = path.dirname(pkgJson);
+    const nodePath = path.join(pkgDir, "build", "Release", "better_sqlite3.node");
+    if (fs.existsSync(nodePath)) return nodePath;
+  } catch {}
+  return undefined;
+}
 import {
   InsertUser,
   users,
@@ -39,7 +52,8 @@ export async function getDb() {
     try {
       const dbPath = getDbPath();
       fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-      const sqlite = new Database(dbPath);
+      const nativeBinding = getNativeBinding();
+      const sqlite = new Database(dbPath, nativeBinding ? { nativeBinding } : undefined);
       sqlite.pragma("journal_mode = WAL");
       sqlite.pragma("foreign_keys = ON");
       _db = drizzle(sqlite);
@@ -1075,7 +1089,8 @@ export async function initDbIfNeeded(): Promise<void> {
   const path = await import("path");
   const Database = (await import("better-sqlite3")).default;
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const sqlite = new Database(dbPath);
+  const nativeBinding2 = getNativeBinding();
+  const sqlite = new Database(dbPath, nativeBinding2 ? { nativeBinding: nativeBinding2 } : undefined);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
   // Check if tables exist

@@ -436,6 +436,65 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    /**
+     * saveThumbnail — accepts a base64-encoded PNG from the browser's
+     * canvas.toDataURL(), writes it to the model's folder, and registers
+     * it in the model's images array so it shows up as a render.
+     */
+    saveThumbnail: protectedProcedure
+      .input(z.object({
+        modelId: z.number(),
+        /** base64-encoded PNG (without the data:image/png;base64, prefix) */
+        pngBase64: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const nodePath = require("path") as typeof import("path");
+        const model = await db.getModelById(input.modelId);
+        if (!model) throw new TRPCError({ code: "NOT_FOUND", message: "Model not found" });
+
+        // Determine the folder to save into (rootPath is the model's folder)
+        const folderPath = (model as any).rootPath as string | null;
+        if (!folderPath) throw new TRPCError({ code: "BAD_REQUEST", message: "Model has no folder path" });
+
+        // Write the PNG file
+        const fileName = `thumbnail_generated_${Date.now()}.png`;
+        const absPath = nodePath.join(folderPath, fileName);
+        const buf = Buffer.from(input.pngBase64, "base64");
+        fs.writeFileSync(absPath, buf);
+
+        // Register it in the model's images array
+        const imgs: any[] = JSON.parse((model.images as any) ?? "[]");
+        const relativePath = nodePath.relative(folderPath, absPath).replace(/\\/g, "/");
+        const fileId = `generated_thumb_${Date.now()}`;
+        imgs.unshift({
+          fileId,
+          name: fileName,
+          absPath,
+          relativePath,
+          thumbnailLink: `/local-files/${relativePath}`,
+          webContentLink: `/local-files/${relativePath}`,
+          mimeType: "image/png",
+        });
+        const { getDb } = await import("./db");
+        const { models } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const dbConn = await getDb();
+        if (dbConn) {
+          await dbConn.update(models)
+            .set({ images: JSON.stringify(imgs) as any, imageCount: imgs.length })
+            .where(eq(models.id, input.modelId));
+        }
+
+        // Also set as hero image so it shows on the library card immediately
+        await db.updateModelHeroImage(input.modelId, `/local-files/${relativePath}`, "manual");
+
+        return {
+          success: true,
+          imageUrl: `/local-files/${relativePath}`,
+          fileName,
+        };
+      }),
+
     zipContents: protectedProcedure
       .input(z.object({ filePath: z.string(), fileName: z.string() }))
       .query(async ({ input }) => {

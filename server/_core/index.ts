@@ -223,6 +223,73 @@ async function startServer() {
     setTimeout(() => process.exit(0), 500);
   });
 
+  // Save generated thumbnail — accepts raw PNG bytes (application/octet-stream)
+  // This avoids tRPC's internal body-size limit that truncates large base64 payloads.
+  app.post("/api/save-thumbnail", express.raw({ type: "application/octet-stream", limit: "20mb" }), async (req, res) => {
+    try {
+      const modelId = parseInt((req.query as any).modelId);
+      if (!modelId || isNaN(modelId)) {
+        res.status(400).json({ error: "modelId query param required" });
+        return;
+      }
+      const pngBuffer = req.body as Buffer;
+      if (!pngBuffer || pngBuffer.length < 100) {
+        res.status(400).json({ error: "No PNG data received" });
+        return;
+      }
+
+      const nodePath = require("path") as typeof import("path");
+      const { getDb } = await import("../db");
+      const { models } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await import("../db");
+
+      const model = await db.getModelById(modelId);
+      if (!model) {
+        res.status(404).json({ error: "Model not found" });
+        return;
+      }
+
+      const folderPath = (model as any).rootPath as string | null;
+      if (!folderPath) {
+        res.status(400).json({ error: "Model has no folder path" });
+        return;
+      }
+
+      const fileName = `thumbnail_generated_${Date.now()}.png`;
+      const absPath = nodePath.join(folderPath, fileName);
+      fs.writeFileSync(absPath, pngBuffer);
+
+      // Register in images array
+      const imgs: any[] = JSON.parse((model.images as any) ?? "[]");
+      const relativePath = nodePath.relative(folderPath, absPath).replace(/\\/g, "/");
+      const fileId = `generated_thumb_${Date.now()}`;
+      imgs.unshift({
+        fileId,
+        name: fileName,
+        absPath,
+        relativePath,
+        thumbnailLink: `/local-files/${relativePath}`,
+        webContentLink: `/local-files/${relativePath}`,
+        mimeType: "image/png",
+      });
+      const dbConn = await getDb();
+      if (dbConn) {
+        await dbConn.update(models)
+          .set({ images: JSON.stringify(imgs) as any, imageCount: imgs.length })
+          .where(eq(models.id, modelId));
+      }
+
+      // Set as hero image
+      await db.updateModelHeroImage(modelId, `/local-files/${relativePath}`, "manual");
+
+      res.json({ success: true, imageUrl: `/local-files/${relativePath}`, fileName });
+    } catch (err: any) {
+      console.error("[save-thumbnail] Error:", err);
+      res.status(500).json({ error: err?.message || "Failed to save thumbnail" });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

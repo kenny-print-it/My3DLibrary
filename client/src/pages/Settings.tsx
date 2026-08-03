@@ -139,7 +139,36 @@ function FolderBrowserDialog({
 }
 
 // ── AI Setup Guide Dialog ──────────────────────────────────────────────────
-function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+interface AIPreset {
+  apiUrl: string;
+  apiKey: string;
+  textModel: string;
+  visionModel: string;
+}
+
+function AISetupGuideDialog({
+  open,
+  onClose,
+  onApply,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onApply?: (preset: AIPreset) => void;
+}) {
+  const [selectedOption, setSelectedOption] = useState<"A" | "B" | "C" | "D" | null>(null);
+
+  const presets: Record<"A" | "B" | "C" | "D", AIPreset> = {
+    A: { apiUrl: "http://localhost:11434", apiKey: "", textModel: "llama3.2-vision", visionModel: "llama3.2-vision" },
+    B: { apiUrl: "https://api.groq.com/openai/v1", apiKey: "", textModel: "llama-3.1-8b-instant", visionModel: "llama-3.2-11b-vision-preview" },
+    C: { apiUrl: "https://api.openai.com/v1", apiKey: "", textModel: "gpt-4o-mini", visionModel: "gpt-4o-mini" },
+    D: { apiUrl: "http://localhost:1234/v1", apiKey: "", textModel: "", visionModel: "" },
+  };
+
+  const handleApply = (option: "A" | "B" | "C" | "D") => {
+    onApply?.(presets[option]);
+    onClose();
+  };
+
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -167,117 +196,197 @@ function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => v
             <p className="text-muted-foreground text-xs mt-2">✅ AI is completely optional — your library works perfectly without it.</p>
           </div>
 
-          {/* Option A: Ollama */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">A</span>
-              Ollama (Free, runs on your PC)
-            </h3>
-            <div className="space-y-2.5 text-muted-foreground text-xs">
-                            <p>Ollama runs AI models directly on your computer — <strong className="text-foreground">no internet connection, no account, and no monthly fee required.</strong> You need a PC with at least 8 GB of RAM.</p>
-
-              <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-3 py-2.5 space-y-2">
-                <p className="font-medium text-green-400">⚡ Easiest way — use the included batch file</p>
-                <p>In your <span className="font-mono">My3DLibrary-Portable</span> folder, double-click <strong className="text-foreground">Download-AI-Model.bat</strong>. It will download and install everything automatically. Then skip to Step 3.</p>
-              </div>
-
-              <p className="font-medium text-foreground/70">— or set it up manually —</p>
-
-              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
-                <p className="font-medium text-foreground">Step 1 — Download and install Ollama</p>
-                <p>Go to <span className="font-mono text-primary">ollama.com/download</span> in your browser and download the Windows version. You'll get a file called <span className="font-mono">OllamaSetup.exe</span>. Run it to install Ollama like any normal program.</p>
-              </div>
-
-              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
-                <p className="font-medium text-foreground">Step 2 — Download the AI model</p>
-                <p>Open the <strong className="text-foreground">Start menu</strong>, search for <strong className="text-foreground">Command Prompt</strong>, and open it. Then type the command below and press <strong className="text-foreground">Enter</strong>:</p>
-                <code className="block bg-black/40 rounded px-2 py-1.5 font-mono text-green-400 text-[11px]">ollama pull llama3.2-vision</code>
-                <p>This downloads the AI model (about 7 GB). It may take 10–30 minutes. <strong className="text-foreground">You only need to do this once.</strong></p>
-              </div>
-
-              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
-                <p className="font-medium text-foreground">Step 3 — Restart My3DLibrary</p>
-                <p>Close the app completely and reopen it using <span className="font-mono">My3DLibrary.exe</span>. Ollama will start automatically in the background — you don't need to do anything else.</p>
-              </div>
-
-              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
-                <p className="font-medium text-foreground">Step 4 — Enter these settings (click Edit above to unlock)</p>
-                <div className="space-y-1.5">
-                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:11434</span> <span className="text-muted-foreground italic">(copy this exactly)</span></p>
-                  <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">leave this blank</span></p>
-                  <p><span className="font-medium text-foreground">Model:</span> <span className="font-mono">llama3.2-vision</span> <span className="text-muted-foreground italic">(copy this exactly)</span></p>
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-2.5">
-                <p className="font-medium text-blue-400">✅ How to check it's working</p>
-                <p className="mt-1">After saving your settings, scroll down to the <strong className="text-foreground">AI Status</strong> section on this page. If it shows a green checkmark next to the model name, AI is ready to use. Then click <strong className="text-foreground">Re-tag All</strong> to automatically tag your models.</p>
-              </div>
+          {/* Quick-select tip */}
+          {onApply && (
+            <div className="rounded-lg bg-primary/10 border border-primary/30 px-4 py-2.5 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary shrink-0" />
+              <p className="text-xs text-foreground"><strong>Tip:</strong> Click <strong>Use This Option</strong> on any option below to auto-fill the settings form — then just add your API key if needed.</p>
             </div>
+          )}
+
+          {/* Option A: Ollama */}
+          <div
+            className={cn(
+              "rounded-xl border transition-all",
+              selectedOption === "A" ? "border-primary bg-primary/5" : "border-border/50"
+            )}
+          >
+            <button
+              className="w-full text-left px-4 pt-4 pb-2 flex items-center gap-2"
+              onClick={() => setSelectedOption(selectedOption === "A" ? null : "A")}
+            >
+              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">A</span>
+              <span className="font-semibold text-foreground text-sm">Ollama (Free, runs on your PC)</span>
+              <ChevronRight className={cn("w-4 h-4 text-muted-foreground ml-auto transition-transform", selectedOption === "A" && "rotate-90")} />
+            </button>
+            {selectedOption === "A" && (
+              <div className="px-4 pb-4 space-y-2.5 text-muted-foreground text-xs">
+                <p>Ollama runs AI models directly on your computer — <strong className="text-foreground">no internet connection, no account, and no monthly fee required.</strong> You need a PC with at least 8 GB of RAM.</p>
+
+                <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-3 py-2.5 space-y-2">
+                  <p className="font-medium text-green-400">⚡ Easiest way — use the included batch file</p>
+                  <p>In your <span className="font-mono">My3DLibrary-Portable</span> folder, double-click <strong className="text-foreground">Download-AI-Model.bat</strong>. It will download and install everything automatically. Then skip to Step 3.</p>
+                </div>
+
+                <p className="font-medium text-foreground/70">— or set it up manually —</p>
+
+                <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
+                  <p className="font-medium text-foreground">Step 1 — Download and install Ollama</p>
+                  <p>Go to <span className="font-mono text-primary">ollama.com/download</span> in your browser and download the Windows version. You'll get a file called <span className="font-mono">OllamaSetup.exe</span>. Run it to install Ollama like any normal program.</p>
+                </div>
+
+                <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
+                  <p className="font-medium text-foreground">Step 2 — Download the AI model</p>
+                  <p>Open the <strong className="text-foreground">Start menu</strong>, search for <strong className="text-foreground">Command Prompt</strong>, and open it. Then type the command below and press <strong className="text-foreground">Enter</strong>:</p>
+                  <code className="block bg-black/40 rounded px-2 py-1.5 font-mono text-green-400 text-[11px]">ollama pull llama3.2-vision</code>
+                  <p>This downloads the AI model (about 7 GB). It may take 10–30 minutes. <strong className="text-foreground">You only need to do this once.</strong></p>
+                </div>
+
+                <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
+                  <p className="font-medium text-foreground">Step 3 — Restart My3DLibrary</p>
+                  <p>Close the app completely and reopen it using <span className="font-mono">My3DLibrary.exe</span>. Ollama will start automatically in the background.</p>
+                </div>
+
+                <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1.5">
+                  <p className="font-medium text-foreground">Settings that will be filled in:</p>
+                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:11434</span></p>
+                  <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">leave blank</span></p>
+                  <p><span className="font-medium text-foreground">Model:</span> <span className="font-mono">llama3.2-vision</span></p>
+                </div>
+
+                {onApply && (
+                  <button
+                    onClick={() => handleApply("A")}
+                    className="w-full mt-1 px-4 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Use This Option — Auto-fill Settings
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Option B: Groq — Recommended */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
+          <div
+            className={cn(
+              "rounded-xl border transition-all",
+              selectedOption === "B" ? "border-orange-500 bg-orange-500/5" : "border-border/50"
+            )}
+          >
+            <button
+              className="w-full text-left px-4 pt-4 pb-2 flex items-center gap-2"
+              onClick={() => setSelectedOption(selectedOption === "B" ? null : "B")}
+            >
               <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">B</span>
-              Groq (Free, cloud-based)
-              <span className="text-[10px] font-normal text-orange-400 bg-orange-500/10 border border-orange-500/30 rounded px-1.5 py-0.5 ml-0.5">Recommended</span>
-            </h3>
-            <div className="space-y-2.5 text-muted-foreground text-xs">
-              <p>Groq is a free cloud AI service — <strong className="text-foreground">no GPU required, no large downloads.</strong> It works on any PC and is very fast. You just need a free account.</p>
+              <span className="font-semibold text-foreground text-sm">Groq (Free, cloud-based)</span>
+              <span className="text-[10px] font-normal text-orange-400 bg-orange-500/10 border border-orange-500/30 rounded px-1.5 py-0.5">Recommended</span>
+              <ChevronRight className={cn("w-4 h-4 text-muted-foreground ml-auto transition-transform", selectedOption === "B" && "rotate-90")} />
+            </button>
+            {selectedOption === "B" && (
+              <div className="px-4 pb-4 space-y-2.5 text-muted-foreground text-xs">
+                <p>Groq is a free cloud AI service — <strong className="text-foreground">no GPU required, no large downloads.</strong> It works on any PC and is very fast. You just need a free account.</p>
 
-              <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2.5 space-y-2">
-                <p className="font-medium text-orange-400">Step 1 — Get your free API key</p>
-                <p>Go to <span className="font-mono text-primary">console.groq.com</span> and sign up for free (no credit card needed). Once logged in, click <strong className="text-foreground">API Keys</strong> in the <strong className="text-foreground">top menu bar</strong>, then click <strong className="text-foreground">+ Create API Key</strong>. Copy the key — it starts with <span className="font-mono">gsk_</span>.</p>
-              </div>
+                <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2.5 space-y-2">
+                  <p className="font-medium text-orange-400">Step 1 — Get your free API key</p>
+                  <p>Go to <span className="font-mono text-primary">console.groq.com</span> and sign up for free (no credit card needed). Once logged in, click <strong className="text-foreground">API Keys</strong> in the <strong className="text-foreground">top menu bar</strong>, then click <strong className="text-foreground">+ Create API Key</strong>. Copy the key — it starts with <span className="font-mono">gsk_</span>.</p>
+                </div>
 
-              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1.5">
-                <p className="font-medium text-foreground">Step 2 — Enter these settings (click Edit above to unlock)</p>
-                <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://api.groq.com/openai/v1</span></p>
-                <p><span className="font-medium text-foreground">API Key:</span> your <span className="font-mono">gsk_…</span> key</p>
-                <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">llama-3.1-8b-instant</span></p>
-                <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">llama-3.2-11b-vision-preview</span> <span className="text-muted-foreground italic">(requires free phone verification on Groq — or use <span className="font-mono">llama-3.1-8b-instant</span> for text-only tagging)</span></p>
-              </div>
+                <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1.5">
+                  <p className="font-medium text-foreground">Settings that will be filled in:</p>
+                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://api.groq.com/openai/v1</span></p>
+                  <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">you'll paste your <span className="font-mono">gsk_…</span> key after closing</span></p>
+                  <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">llama-3.1-8b-instant</span></p>
+                  <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">llama-3.2-11b-vision-preview</span></p>
+                </div>
 
-              <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-2.5">
-                <p className="font-medium text-blue-400">✅ How to check it's working</p>
-                <p className="mt-1">After saving, scroll down to <strong className="text-foreground">AI Status</strong> and click <strong className="text-foreground">Check Again</strong>. Green checkmarks mean it's ready. Then click <strong className="text-foreground">Re-tag All</strong>.</p>
+                <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-2.5">
+                  <p className="font-medium text-blue-400">✅ After applying</p>
+                  <p className="mt-1">Paste your API key into the form, save, then scroll down to <strong className="text-foreground">AI Status</strong> and click <strong className="text-foreground">Check Again</strong>.</p>
+                </div>
+
+                {onApply && (
+                  <button
+                    onClick={() => handleApply("B")}
+                    className="w-full mt-1 px-4 py-2 rounded-lg text-xs font-semibold bg-orange-500 text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Use This Option — Auto-fill Settings
+                  </button>
+                )}
               </div>
-            </div>
+            )}
           </div>
 
           {/* Option C: OpenAI */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
+          <div
+            className={cn(
+              "rounded-xl border transition-all",
+              selectedOption === "C" ? "border-primary bg-primary/5" : "border-border/50"
+            )}
+          >
+            <button
+              className="w-full text-left px-4 pt-4 pb-2 flex items-center gap-2"
+              onClick={() => setSelectedOption(selectedOption === "C" ? null : "C")}
+            >
               <span className="w-5 h-5 rounded-full bg-secondary border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">C</span>
-              OpenAI (Paid, cloud-based)
-            </h3>
-            <div className="space-y-2 text-muted-foreground text-xs">
-              <p>If you have an OpenAI API key, you can use GPT-4o for better results. This costs a small amount per model scanned.</p>
-              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1">
-                <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://api.openai.com/v1</span></p>
-                <p><span className="font-medium text-foreground">API Key:</span> your <span className="font-mono">sk-…</span> key from platform.openai.com</p>
-                <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">gpt-4o-mini</span></p>
-                <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">gpt-4o-mini</span></p>
+              <span className="font-semibold text-foreground text-sm">OpenAI (Paid, cloud-based)</span>
+              <ChevronRight className={cn("w-4 h-4 text-muted-foreground ml-auto transition-transform", selectedOption === "C" && "rotate-90")} />
+            </button>
+            {selectedOption === "C" && (
+              <div className="px-4 pb-4 space-y-2 text-muted-foreground text-xs">
+                <p>If you have an OpenAI API key, you can use GPT-4o for better results. This costs a small amount per model scanned.</p>
+                <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1.5">
+                  <p className="font-medium text-foreground">Settings that will be filled in:</p>
+                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://api.openai.com/v1</span></p>
+                  <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">you'll paste your <span className="font-mono">sk-…</span> key after closing</span></p>
+                  <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">gpt-4o-mini</span></p>
+                  <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">gpt-4o-mini</span></p>
+                </div>
+                {onApply && (
+                  <button
+                    onClick={() => handleApply("C")}
+                    className="w-full mt-1 px-4 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Use This Option — Auto-fill Settings
+                  </button>
+                )}
               </div>
-            </div>
+            )}
           </div>
 
           {/* Option D: LM Studio */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-2 flex items-center gap-1.5">
+          <div
+            className={cn(
+              "rounded-xl border transition-all",
+              selectedOption === "D" ? "border-primary bg-primary/5" : "border-border/50"
+            )}
+          >
+            <button
+              className="w-full text-left px-4 pt-4 pb-2 flex items-center gap-2"
+              onClick={() => setSelectedOption(selectedOption === "D" ? null : "D")}
+            >
               <span className="w-5 h-5 rounded-full bg-secondary border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">D</span>
-              LM Studio (Free, GUI-based)
-            </h3>
-            <div className="space-y-2 text-muted-foreground text-xs">
-              <p>LM Studio is a desktop app that lets you run local models with a friendly interface. Start the local server in LM Studio, then use:</p>
-              <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1">
-                <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:1234/v1</span></p>
-                <p><span className="font-medium text-foreground">API Key:</span> leave blank</p>
-                <p><span className="font-medium text-foreground">Text Model:</span> the model name shown in LM Studio</p>
-                <p><span className="font-medium text-foreground">Vision Model:</span> the model name shown in LM Studio</p>
+              <span className="font-semibold text-foreground text-sm">LM Studio (Free, GUI-based)</span>
+              <ChevronRight className={cn("w-4 h-4 text-muted-foreground ml-auto transition-transform", selectedOption === "D" && "rotate-90")} />
+            </button>
+            {selectedOption === "D" && (
+              <div className="px-4 pb-4 space-y-2 text-muted-foreground text-xs">
+                <p>LM Studio is a desktop app that lets you run local models with a friendly interface. Start the local server in LM Studio, then use:</p>
+                <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1.5">
+                  <p className="font-medium text-foreground">Settings that will be filled in:</p>
+                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:1234/v1</span></p>
+                  <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">leave blank</span></p>
+                  <p><span className="font-medium text-foreground">Text/Vision Model:</span> <span className="italic">enter the model name shown in LM Studio after applying</span></p>
+                </div>
+                {onApply && (
+                  <button
+                    onClick={() => handleApply("D")}
+                    className="w-full mt-1 px-4 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Use This Option — Auto-fill Settings
+                  </button>
+                )}
               </div>
-            </div>
+            )}
           </div>
 
         </div>
@@ -285,9 +394,9 @@ function AISetupGuideDialog({ open, onClose }: { open: boolean; onClose: () => v
         <div className="px-5 py-4 border-t border-border/50">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+            className="w-full px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-foreground hover:bg-accent transition-colors border border-border/50"
           >
-            Got it — close guide
+            Close guide
           </button>
         </div>
       </div>
@@ -498,6 +607,17 @@ export default function Settings() {
       <AISetupGuideDialog
         open={showAIGuide}
         onClose={() => setShowAIGuide(false)}
+        onApply={(preset) => {
+          setLlmApiUrl(preset.apiUrl);
+          setLlmApiKey(preset.apiKey);
+          setLlmTextModel(preset.textModel);
+          setLlmVisionModel(preset.visionModel);
+          // Also set the legacy single-model field to the vision model for backward compat
+          setLlmModel(preset.visionModel || preset.textModel);
+          // Ensure the form is in edit mode so the user can see and save the values
+          setIsLlmEditing(true);
+          toast.success("Settings filled in — add your API key if needed, then click Save.");
+        }}
       />
 
       <div className="container py-8 max-w-2xl">
