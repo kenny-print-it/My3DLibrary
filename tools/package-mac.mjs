@@ -40,8 +40,8 @@ cpSync(`${MAC_EXTRAS}/My3DLibrary.app/Contents/Resources/dist/node_modules_arm64
 // 6. NEW dist/ (freshly built frontend + server bundle)
 cpSync(`${PORTABLE}/dist`, `${APP}/Resources/dist`, { recursive: true });
 
-// 7. README-Mac.txt (root level)
-cpSync(`${MAC_EXTRAS}/README-Mac.txt`, `${STAGING}/README-Mac.txt`);
+// 7. Source-controlled current README-Mac.txt (root level)
+cpSync("tools/portable-assets/mac/README-Mac.txt", `${STAGING}/README-Mac.txt`);
 
 // 8. Create the ZIP
 if (existsSync(OUT)) rmSync(OUT);

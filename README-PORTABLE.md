@@ -60,8 +60,8 @@ AI tagging automatically describes and tags your 3D models by analysing their th
 
 | Option | Cost | GPU Required | Best For |
 |--------|------|-------------|---------|
-| **Groq** ⭐ Recommended | Free | No | Quick setup, any PC |
-| **Ollama (local)** | Free | Recommended | Full offline, privacy |
+| **Ollama (local)** ⭐ Recommended | Free after download | Optional | Full text + image AI, offline, private |
+| **Groq** | Provider-controlled quota/pricing | No | Optional text-only tags only |
 | **OpenAI** | ~$0.01/model | No | Highest quality |
 | **LM Studio** | Free | Recommended | Local, any OpenAI-compatible model |
 
@@ -74,15 +74,7 @@ Each option (A–D) is a collapsible card. Click any card to expand it and read 
 - Opens the settings form in edit mode so you can review the values
 - Leaves the API key blank for options that need one (Groq, OpenAI)
 
-### Option A — Groq (Free Cloud AI, No GPU Needed)
-
-1. Go to [console.groq.com](https://console.groq.com) and create a free account
-2. Click **API Keys → Create API Key** and copy the key (starts with `gsk_...`)
-3. In the AI Setup Guide, click **Option A → Use This Option** — the URL and models fill in automatically
-4. Paste your API key, then click **Save & Lock**
-5. Click **Check Again** — both models should turn green
-
-### Option B — Ollama (Free Local AI, Offline)
+### Option A — Ollama (Free Local AI, Offline)
 
 1. **Run `Download-AI-Model.bat`** (included in the app folder)
    - Downloads and installs Ollama if needed
@@ -92,6 +84,12 @@ Each option (A–D) is a collapsible card. Click any card to expand it and read 
 3. Go to **Settings → AI Status** and click **Check Again** to confirm both models are green
 
 > **Tip:** The models are stored inside the app folder — move the entire folder to another PC or USB drive and it works without re-downloading.
+
+### Option B — Groq (Optional Text-Only Cloud AI)
+
+Groq is no longer recommended for the complete AI workflow. The models previously suggested by My3DLibrary are being retired, and Groq's suggested replacement, `openai/gpt-oss-20b`, does not analyse images. It can provide text-only suggestions from model names and filenames, but not image-based tags or hero-image selection.
+
+Choose the **Ollama** option for free local text-and-image AI. Choose Groq only if you intentionally want cloud text tagging and have confirmed the provider's current API limits and pricing.
 
 ---
 
@@ -113,7 +111,7 @@ Close the console window that opened when you launched `My3DLibrary.exe`, or pre
 
 **Antivirus quarantines the exe:** The `.exe` is a bundled Node.js app — it contains no malware. Add the folder to your antivirus exclusions.
 
-**AI tagging not working:** Ensure `ollama.exe` is in the `ollama\` subfolder and that Ollama started successfully (check for a minimised "Ollama" window in the taskbar). Or use the AI Setup Guide in Settings to switch to Groq (no GPU needed).
+**AI tagging not working:** Ensure `ollama.exe` is in the `ollama\` subfolder and that Ollama started successfully (check for a minimised "Ollama" window in the taskbar). The recommended recovery path is the AI Setup Guide's free local Ollama option; Groq is available only for optional text-only tagging.
 
 **3D viewer shows a blank screen:** The model file may be very large or use an unusual format. Try a different file in the same model folder using the file selector strip.
 

@@ -1,7 +1,7 @@
 # My3DLibrary — Portable 3D Model Library Manager
 
 **A free, self-hosted Plex-style library for your 3D print model collection.**  
-No installation required. Runs on any Windows 10/11 PC straight from a folder or USB drive.
+No installation required. Runs from an extracted folder or USB drive on Windows or macOS.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.2--Beta-blue.svg)](https://github.com/kenny-print-it/My3DLibrary/releases)
@@ -18,7 +18,7 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 - **Multi-file viewer** — when a model has multiple STL/3MF files, a file selector strip lets you switch between them instantly
 - **Generate Thumbnail** — capture a thumbnail from the 3D viewer with one click; auto-orients to a hero angle or captures your current rotation. A bulk ✦ button generates thumbnails for every model missing renders in one pass
 - **Retake Thumbnail** — hover over any model image and click "Retake Thumbnail" to re-orient the 3D viewer and capture a replacement thumbnail
-- **Auto-tag** models using local AI (Ollama) or free cloud AI (Groq) — no subscription required
+- **Auto-tag** models using free local AI (Ollama), with an optional Groq text-only compatibility mode
 - **AI Setup Guide** — interactive wizard with one-click auto-fill for all AI provider settings
 - **Search** by name, tag, or collection
 - **Manage** multiple library locations across different drives
@@ -32,9 +32,14 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 
 ## Download
 
-👉 **[Download the latest release](https://github.com/kenny-print-it/My3DLibrary/releases)**
+| Platform | Current build | Download |
+|---|---:|---|
+| Windows | **Build 10** | [Download Windows Build 10](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.2-beta/My3DLibrary-Windows-v1.2-Beta-build10.zip) |
+| macOS | **Build 18** | [Download Mac Build 18](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.2-beta/My3DLibrary-Mac-v1.2-Beta-build18.zip) |
 
-Just unzip and double-click `My3DLibrary.exe`. That's it.
+Previous builds remain available on the [full releases page](https://github.com/kenny-print-it/My3DLibrary/releases).
+
+Extract the ZIP first. On Windows, double-click `My3DLibrary.exe`. On macOS, move `My3DLibrary.app` to a normal folder and open it.
 
 ---
 
@@ -46,7 +51,7 @@ Just unzip and double-click `My3DLibrary.exe`. That's it.
 
 ## Quick Start
 
-1. Download and unzip `My3DLibrary-Windows-v1.2-Beta-build9.zip`
+1. Download and unzip `My3DLibrary-Windows-v1.2-Beta-build10.zip`
 2. Double-click `My3DLibrary.exe`
 3. Your browser opens automatically at `http://localhost:3000`
 4. Go to **Settings → Library**, click **Add Folder**, and point it at your models folder
@@ -116,8 +121,8 @@ My3DLibrary can automatically tag your models by looking at their thumbnail imag
 
 | Option | Cost | GPU Required | Setup |
 |--------|------|-------------|-------|
-| **Groq** ⭐ Recommended | Free | No | Get a free API key at [console.groq.com](https://console.groq.com) |
-| **Ollama (local)** | Free | Recommended | Run `Download-AI-Model.bat` |
+| **Ollama (local)** ⭐ Recommended | Free after download | Optional | Run `Download-AI-Model.bat` for full text + image AI |
+| **Groq** | Provider-controlled quota/pricing | No | Optional **text-only** tagging with `openai/gpt-oss-20b` |
 | **OpenAI** | ~$0.01/model | No | Enter your API key in Settings |
 | **LM Studio** | Free | Recommended | Start the local server, point Settings at `http://localhost:1234/v1` |
 
@@ -127,19 +132,7 @@ In **Settings → AI / LLM Configuration**, click **"AI Setup Guide"** to open t
 
 Each option (A–D) is a collapsible card with step-by-step instructions. At the bottom of each card is a **"Use This Option — Auto-fill Settings"** button that fills in the API URL, text model, and vision model fields automatically. Just paste your API key (if required) and click Save.
 
-### Option A — Groq (Free Cloud AI, No GPU Needed)
-
-Groq is the easiest way to get started. It's free, fast, and works on any PC.
-
-1. Go to [console.groq.com](https://console.groq.com) and create a free account
-2. Click **API Keys** → **Create API Key** and copy the key (starts with `gsk_...`)
-3. In the AI Setup Guide, click **Option A → Use This Option** — the URL and models fill in automatically
-4. Paste your API key, then click **Save & Lock**
-5. Click **Check Again** — both models should turn green
-
-> **No GPU needed.** Groq runs in the cloud and is free for personal use.
-
-### Option B — Ollama (Free Local AI, Fully Offline)
+### Option A — Ollama (Free Local AI, Fully Offline)
 
 Ollama runs entirely on your PC. A GPU is recommended for best performance, but CPU mode is available for PCs without a dedicated GPU.
 
@@ -151,6 +144,12 @@ Ollama runs entirely on your PC. A GPU is recommended for best performance, but 
 3. Go to **Settings → AI Status** and click **Check Again** to confirm both models are green
 
 > **Tip:** The models are stored inside the app folder — move the entire `My3DLibrary-Portable` folder to another PC or USB drive and it works without re-downloading.
+
+### Option B — Groq (Optional Text-Only Cloud AI)
+
+Groq is no longer recommended as the complete AI option. The Groq models previously prefilled by My3DLibrary are being retired, and Groq's suggested replacement, `openai/gpt-oss-20b`, is a text model. It can suggest tags from model names and filenames, but it cannot analyse render images or select a hero image.
+
+Use the AI Setup Guide's **Groq (cloud, text-only)** option only if you specifically want cloud text tagging. Its API availability, limits, and pricing are controlled by Groq. For free text-and-image AI that works offline, use Ollama instead.
 
 ---
 

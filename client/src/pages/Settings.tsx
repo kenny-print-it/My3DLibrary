@@ -158,8 +158,8 @@ function AISetupGuideDialog({
   const [selectedOption, setSelectedOption] = useState<"A" | "B" | "C" | "D" | null>(null);
 
   const presets: Record<"A" | "B" | "C" | "D", AIPreset> = {
-    A: { apiUrl: "http://localhost:11434", apiKey: "", textModel: "llama3.2-vision", visionModel: "llama3.2-vision" },
-    B: { apiUrl: "https://api.groq.com/openai/v1", apiKey: "", textModel: "llama-3.1-8b-instant", visionModel: "llama-3.2-11b-vision-preview" },
+    A: { apiUrl: "http://localhost:11434", apiKey: "", textModel: "llama3.2", visionModel: "gemma3:4b" },
+    B: { apiUrl: "https://api.groq.com/openai/v1", apiKey: "", textModel: "openai/gpt-oss-20b", visionModel: "openai/gpt-oss-20b" },
     C: { apiUrl: "https://api.openai.com/v1", apiKey: "", textModel: "gpt-4o-mini", visionModel: "gpt-4o-mini" },
     D: { apiUrl: "http://localhost:1234/v1", apiKey: "", textModel: "", visionModel: "" },
   };
@@ -216,7 +216,7 @@ function AISetupGuideDialog({
               onClick={() => setSelectedOption(selectedOption === "A" ? null : "A")}
             >
               <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">A</span>
-              <span className="font-semibold text-foreground text-sm">Ollama (Free, runs on your PC)</span>
+              <span className="font-semibold text-foreground text-sm">Ollama (Free, local — recommended)</span>
               <ChevronRight className={cn("w-4 h-4 text-muted-foreground ml-auto transition-transform", selectedOption === "A" && "rotate-90")} />
             </button>
             {selectedOption === "A" && (
@@ -236,10 +236,10 @@ function AISetupGuideDialog({
                 </div>
 
                 <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
-                  <p className="font-medium text-foreground">Step 2 — Download the AI model</p>
+                  <p className="font-medium text-foreground">Step 2 — Download the free local AI models</p>
                   <p>Open the <strong className="text-foreground">Start menu</strong>, search for <strong className="text-foreground">Command Prompt</strong>, and open it. Then type the command below and press <strong className="text-foreground">Enter</strong>:</p>
-                  <code className="block bg-black/40 rounded px-2 py-1.5 font-mono text-green-400 text-[11px]">ollama pull llama3.2-vision</code>
-                  <p>This downloads the AI model (about 7 GB). It may take 10–30 minutes. <strong className="text-foreground">You only need to do this once.</strong></p>
+                  <code className="block bg-black/40 rounded px-2 py-1.5 font-mono text-green-400 text-[11px] whitespace-pre-wrap">ollama pull llama3.2{`\n`}ollama pull gemma3:4b</code>
+                  <p>This downloads a fast text model and a vision model (about 5.3 GB total). It may take 10–30 minutes. <strong className="text-foreground">You only need to do this once.</strong></p>
                 </div>
 
                 <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-2">
@@ -251,7 +251,9 @@ function AISetupGuideDialog({
                   <p className="font-medium text-foreground">Settings that will be filled in:</p>
                   <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">http://localhost:11434</span></p>
                   <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">leave blank</span></p>
-                  <p><span className="font-medium text-foreground">Model:</span> <span className="font-mono">llama3.2-vision</span></p>
+                  <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">llama3.2</span></p>
+                  <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">gemma3:4b</span></p>
+                  <p className="pt-1">For a smaller CPU-only vision option, use <span className="font-mono">moondream</span> as the Vision Model instead.</p>
                 </div>
 
                 {onApply && (
@@ -266,7 +268,7 @@ function AISetupGuideDialog({
             )}
           </div>
 
-          {/* Option B: Groq — Recommended */}
+          {/* Option B: Groq — text-only compatibility option */}
           <div
             className={cn(
               "rounded-xl border transition-all",
@@ -278,25 +280,30 @@ function AISetupGuideDialog({
               onClick={() => setSelectedOption(selectedOption === "B" ? null : "B")}
             >
               <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">B</span>
-              <span className="font-semibold text-foreground text-sm">Groq (Free, cloud-based)</span>
-              <span className="text-[10px] font-normal text-orange-400 bg-orange-500/10 border border-orange-500/30 rounded px-1.5 py-0.5">Recommended</span>
+              <span className="font-semibold text-foreground text-sm">Groq (cloud, text-only)</span>
+              <span className="text-[10px] font-normal text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5">Limited</span>
               <ChevronRight className={cn("w-4 h-4 text-muted-foreground ml-auto transition-transform", selectedOption === "B" && "rotate-90")} />
             </button>
             {selectedOption === "B" && (
               <div className="px-4 pb-4 space-y-2.5 text-muted-foreground text-xs">
-                <p>Groq is a free cloud AI service — <strong className="text-foreground">no GPU required, no large downloads.</strong> It works on any PC and is very fast. You just need a free account.</p>
+                <p>Groq remains an optional cloud service for <strong className="text-foreground">text-only tag suggestions</strong>. It is no longer recommended for the complete AI workflow because the former Groq text and vision models used by My3DLibrary are being retired, and Groq's suggested text replacement does not analyse images.</p>
+
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2.5 space-y-1.5">
+                  <p className="font-medium text-amber-400">Why this option is limited</p>
+                  <p>The replacement model, <span className="font-mono">openai/gpt-oss-20b</span>, can tag model names and filenames, but it cannot inspect hero images. Choose Ollama above if you want free local image-based tagging and hero-image analysis.</p>
+                </div>
 
                 <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2.5 space-y-2">
                   <p className="font-medium text-orange-400">Step 1 — Get your free API key</p>
-                  <p>Go to <span className="font-mono text-primary">console.groq.com</span> and sign up for free (no credit card needed). Once logged in, click <strong className="text-foreground">API Keys</strong> in the <strong className="text-foreground">top menu bar</strong>, then click <strong className="text-foreground">+ Create API Key</strong>. Copy the key — it starts with <span className="font-mono">gsk_</span>.</p>
+                  <p>Go to <span className="font-mono text-primary">console.groq.com</span>, create an API key, and copy the key — it starts with <span className="font-mono">gsk_</span>. Groq availability, quotas, and prices are controlled by Groq and can change.</p>
                 </div>
 
                 <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1.5">
                   <p className="font-medium text-foreground">Settings that will be filled in:</p>
                   <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://api.groq.com/openai/v1</span></p>
                   <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">you'll paste your <span className="font-mono">gsk_…</span> key after closing</span></p>
-                  <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">llama-3.1-8b-instant</span></p>
-                  <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">llama-3.2-11b-vision-preview</span></p>
+                  <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">openai/gpt-oss-20b</span></p>
+                  <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">same as Text Model (image pass disabled)</span></p>
                 </div>
 
                 <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-2.5">
@@ -309,7 +316,7 @@ function AISetupGuideDialog({
                     onClick={() => handleApply("B")}
                     className="w-full mt-1 px-4 py-2 rounded-lg text-xs font-semibold bg-orange-500 text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Use This Option — Auto-fill Settings
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Use Text-Only Groq — Auto-fill Settings
                   </button>
                 )}
               </div>

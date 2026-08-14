@@ -23,9 +23,12 @@ mkdirSync(`${STAGING}/My3DLibrary-Portable/ollama`, { recursive: true });
 cpSync(`${WIN_EXTRAS}/My3DLibrary.exe`, `${STAGING}/My3DLibrary.exe`);
 
 // 2. Portable folder — launcher scripts and icons
-for (const f of ["Start.bat", "Stop.bat", "README.txt", "Download-AI-Model.bat", "kenny-logo.ico"]) {
+for (const f of ["Start.bat", "Stop.bat", "kenny-logo.ico"]) {
   cpSync(`${WIN_EXTRAS}/My3DLibrary-Portable/${f}`, `${STAGING}/My3DLibrary-Portable/${f}`);
 }
+// 2a. Source-controlled current documentation and AI setup script
+cpSync("tools/portable-assets/windows/README.txt", `${STAGING}/My3DLibrary-Portable/README.txt`);
+cpSync("tools/portable-assets/windows/Download-AI-Model.bat", `${STAGING}/My3DLibrary-Portable/Download-AI-Model.bat`);
 // 2b. Silent VBScript launcher (new — hides terminal windows)
 cpSync(`${WIN_EXTRAS}/My3DLibrary-Portable/Start.vbs`, `${STAGING}/My3DLibrary-Portable/Start.vbs`);
 // 2c. PowerShell launcher script (required by Start.vbs and My3DLibrary.exe)

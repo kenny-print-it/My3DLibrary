@@ -18,9 +18,10 @@ const RELEASES: Release[] = [
     date: "July 2026",
     label: "Current",
     entries: [
+      { type: "improve", text: "AI provider guidance updated — Ollama is now the recommended free text-and-image option. Groq is retained only as an optional text-only compatibility option because the previously suggested Groq models are being retired and its replacement does not analyse images." },
       { type: "feat", text: "Dual-model AI tagging — separate Text Model (name/file tagging) and Vision Model (hero image analysis)" },
-      { type: "feat", text: "GPU / CPU mode selection in Download-AI-Model.bat — CPU mode uses smaller models (~3.7 GB) for PCs without a dedicated GPU" },
-      { type: "feat", text: "Groq cloud AI support — free API, no GPU required, works on any PC" },
+      { type: "feat", text: "GPU / CPU mode selection in Download-AI-Model.bat — the full local setup uses a text model plus a vision model, while CPU mode uses smaller models for PCs without a dedicated GPU" },
+      { type: "feat", text: "Groq cloud AI support — optional text-only provider for users who choose a Groq API key" },
       { type: "feat", text: "Ollama auto-installer in Download-AI-Model.bat — no manual Ollama setup needed" },
       { type: "feat", text: "App auto-restarts after Download-AI-Model.bat completes — browser reopens automatically" },
       { type: "feat", text: "Silent launcher — no terminal windows visible when opening the app" },
