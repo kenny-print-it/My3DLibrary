@@ -4,7 +4,7 @@
 No installation required. Runs from an extracted folder or USB drive on Windows or macOS.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2--Beta-blue.svg)](https://github.com/kenny-print-it/My3DLibrary/releases)
+[![Version](https://img.shields.io/badge/version-1.3--Beta-blue.svg)](https://github.com/kenny-print-it/My3DLibrary/releases/tag/v1.3-beta)
 [![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/kennyprintit)
 
 ---
@@ -21,6 +21,7 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 - **Auto-tag** models using free local AI (Ollama), with an optional Groq text-only compatibility mode
 - **AI Setup Guide** — interactive wizard with one-click auto-fill for all AI provider settings
 - **Search** by name, tag, or collection
+- **Browse your way** — use Collections, category Tabs, or Compact List; pin favorite collections and use existing hero images as collection covers
 - **Manage** multiple library locations across different drives
 - **Recycle bin** — soft-delete models with restore and purge options
 - **Bulk tag** — apply or remove tags across multiple models at once
@@ -34,8 +35,8 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 
 | Platform | Current build | Download |
 |---|---:|---|
-| Windows | **Build 10** | [Download Windows Build 10](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.2-beta/My3DLibrary-Windows-v1.2-Beta-build10.zip) |
-| macOS | **Build 18** | [Download Mac Build 18](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.2-beta/My3DLibrary-Mac-v1.2-Beta-build18.zip) |
+| Windows | **v1.3 Beta — Build 1** | [Download Windows Build 1](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Windows-v1.3-Beta-build1.zip) |
+| macOS | **v1.3 Beta — Build 1** | [Download Mac Build 1](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Mac-v1.3-Beta-build1.zip) |
 
 Previous builds remain available on the [full releases page](https://github.com/kenny-print-it/My3DLibrary/releases).
 
@@ -51,7 +52,7 @@ Extract the ZIP first. On Windows, double-click `My3DLibrary.exe`. On macOS, mov
 
 ## Quick Start
 
-1. Download and unzip `My3DLibrary-Windows-v1.2-Beta-build10.zip`
+1. Download and unzip `My3DLibrary-Windows-v1.3-Beta-build1.zip`
 2. Double-click `My3DLibrary.exe`
 3. Your browser opens automatically at `http://localhost:3000`
 4. Go to **Settings → Library**, click **Add Folder**, and point it at your models folder
@@ -138,7 +139,7 @@ Ollama runs entirely on your PC. A GPU is recommended for best performance, but 
 
 1. **Run `Download-AI-Model.bat`** (included in the app folder)
    - Automatically downloads and installs Ollama if needed
-   - Asks whether you want **GPU mode** (~7 GB download) or **CPU mode** (~3.7 GB download)
+   - Asks whether you want **GPU mode** (~5.3 GB download) or **CPU mode** (~3.7 GB download)
    - Downloads the correct models and configures the app automatically
 2. **Restart `My3DLibrary.exe`**
 3. Go to **Settings → AI Status** and click **Check Again** to confirm both models are green
@@ -162,7 +163,7 @@ pnpm install
 # Run in development mode
 pnpm dev
 
-# Build (frontend + server bundle + sync to printlib-portable)
+# Build (frontend + server bundle)
 pnpm run build
 ```
 

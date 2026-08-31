@@ -1,4 +1,4 @@
-# My3DLibrary Portable
+# My3DLibrary v1.3 Beta Portable
 
 **No installation required.** Extract anywhere — a folder on your PC, an external hard drive, or a USB drive — and double-click `My3DLibrary.exe`.
 
@@ -13,6 +13,18 @@
 5. Click **Start Scan** — your library populates automatically
 
 That's it. No Docker, no installation, no admin rights needed.
+
+---
+
+## Library Browsing
+
+Choose the layout that works best for your collection:
+
+- **Collections** keeps the original expandable category sections.
+- **Tabs** puts every category in a horizontal tab bar, so you can switch collections without scrolling through the full library.
+- **Compact List** shows a dense row for each model with its thumbnail, collection, tags, file count, and render count. Sort it by model name, collection, tags, or files.
+
+The app remembers your chosen layout, selected tab, Compact List sorting, and Recently Added visibility on that computer. Owners can also pin favorite collections so they stay first. Category sections and selected Tabs use a model’s existing hero image as a cover banner when one is available.
 
 ---
 
@@ -45,12 +57,12 @@ My3DLibrary includes a built-in interactive 3D viewer for **STL** and **3MF** fi
 If a model has no render images but has an STL or 3MF file, a **"Generate Thumbnail"** button appears below the viewer.
 
 Clicking it:
-1. Samples **28 camera angles** around the model to find the most informative view
-2. Renders a high-quality **512×512 PNG** at the best angle
+1. Uses a classic 3/4 hero angle if you have not manually rotated the viewer
+2. Captures the visible Three.js canvas as a **512×512 PNG**
 3. Saves the PNG directly into the model's folder
 4. Sets it as the hero image on the library card — no rescan needed
 
-If you have multiple 3D files, select the one you want in the file selector strip first, then click Generate Thumbnail.
+If you rotate the model yourself first, the app captures your current angle. If you have multiple 3D files, select the one you want in the file selector strip first, then click Generate Thumbnail.
 
 ---
 
@@ -78,7 +90,7 @@ Each option (A–D) is a collapsible card. Click any card to expand it and read 
 
 1. **Run `Download-AI-Model.bat`** (included in the app folder)
    - Downloads and installs Ollama if needed
-   - Asks whether you want **GPU mode** (~7 GB) or **CPU mode** (~3.7 GB)
+   - Asks whether you want **GPU mode** (~5.3 GB) or **CPU mode** (~3.7 GB)
    - Downloads the correct models and configures the app automatically
 2. **Restart `My3DLibrary.exe`**
 3. Go to **Settings → AI Status** and click **Check Again** to confirm both models are green

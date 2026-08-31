@@ -1,15 +1,15 @@
 /**
  * package-win.mjs
- * Builds My3DLibrary-Windows-v1.2-Beta.zip using the system zip command.
+ * Builds My3DLibrary-Windows-v1.3-Beta.zip using the system zip command.
  * Uses new dist/ (freshly built) + existing runtime/node.exe, node_modules, launcher files.
  */
 import { execSync } from "child_process";
 import { existsSync, mkdirSync, rmSync, cpSync } from "fs";
 
-const PORTABLE = "/home/ubuntu/printlib-portable";
+const PORTABLE = "/home/ubuntu/My3DLibrary-src";
 const WIN_EXTRAS = "/tmp/win-extras";
 const STAGING = "/tmp/win-staging";
-const OUT = "/home/ubuntu/My3DLibrary-Windows-v1.2-Beta.zip";
+const OUT = "/home/ubuntu/My3DLibrary-Windows-v1.3-Beta.zip";
 
 console.log("📦 Packaging Windows ZIP...");
 
@@ -28,6 +28,7 @@ for (const f of ["Start.bat", "Stop.bat", "kenny-logo.ico"]) {
 }
 // 2a. Source-controlled current documentation and AI setup script
 cpSync("tools/portable-assets/windows/README.txt", `${STAGING}/My3DLibrary-Portable/README.txt`);
+cpSync("README-PORTABLE.md", `${STAGING}/My3DLibrary-Portable/README-PORTABLE.md`);
 cpSync("tools/portable-assets/windows/Download-AI-Model.bat", `${STAGING}/My3DLibrary-Portable/Download-AI-Model.bat`);
 // 2b. Silent VBScript launcher (new — hides terminal windows)
 cpSync(`${WIN_EXTRAS}/My3DLibrary-Portable/Start.vbs`, `${STAGING}/My3DLibrary-Portable/Start.vbs`);

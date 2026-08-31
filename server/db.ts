@@ -226,7 +226,7 @@ export async function upsertCategory(data: {
 export async function getAllCategories() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(categories).orderBy(asc(categories.sortOrder), asc(categories.name));
+  return db.select().from(categories).orderBy(desc(categories.isPinned), asc(categories.sortOrder), asc(categories.name));
 }
 
 export async function reorderCategories(orderedIds: number[]) {
@@ -244,6 +244,12 @@ export async function updateCategoryLabel(driveId: string, customLabel: string) 
   const db = await getDb();
   if (!db) return;
   await db.update(categories).set({ customLabel }).where(eq(categories.driveId, driveId));
+}
+
+export async function setCategoryPinned(id: number, isPinned: boolean) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(categories).set({ isPinned }).where(eq(categories.id, id));
 }
 
 // ─── Models ──────────────────────────────────────────────────────────────────
@@ -1064,7 +1070,7 @@ export async function deleteResource(id: number): Promise<void> {
 const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS \`access_requests\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`email\` text NOT NULL,\n\t\`name\` text,\n\t\`openId\` text,\n\t\`status\` text DEFAULT 'pending' NOT NULL,\n\t\`preAdded\` integer DEFAULT false NOT NULL,\n\t\`requestedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`reviewedAt\` integer\n);
 CREATE UNIQUE INDEX IF NOT EXISTS \`access_requests_email_unique\` ON \`access_requests\` (\`email\`);
-CREATE TABLE IF NOT EXISTS \`categories\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`driveId\` text,\n\t\`name\` text NOT NULL,\n\t\`customLabel\` text,\n\t\`parentDriveId\` text,\n\t\`path\` text,\n\t\`sortOrder\` integer DEFAULT 0 NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
+CREATE TABLE IF NOT EXISTS \`categories\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`driveId\` text,\n\t\`name\` text NOT NULL,\n\t\`customLabel\` text,\n\t\`parentDriveId\` text,\n\t\`path\` text,\n\t\`sortOrder\` integer DEFAULT 0 NOT NULL,\n\t\`isPinned\` integer DEFAULT false NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
 CREATE UNIQUE INDEX IF NOT EXISTS \`categories_driveId_unique\` ON \`categories\` (\`driveId\`);
 CREATE TABLE IF NOT EXISTS \`library_paths\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`path\` text NOT NULL,\n\t\`label\` text NOT NULL,\n\t\`enabled\` integer DEFAULT true NOT NULL,\n\t\`scanDepth\` integer DEFAULT 2 NOT NULL,\n\t\`sortOrder\` integer DEFAULT 0 NOT NULL,\n\t\`createdAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL,\n\t\`updatedAt\` integer DEFAULT (unixepoch('now') * 1000) NOT NULL\n);
 CREATE TABLE IF NOT EXISTS \`model_tags\` (\n\t\`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t\`modelId\` integer NOT NULL,\n\t\`tagId\` integer NOT NULL\n);
@@ -1107,6 +1113,10 @@ export async function initDbIfNeeded(): Promise<void> {
   try {
     sqlite.exec("ALTER TABLE models ADD COLUMN sourceUrl text;");
     console.log("[DB Migrate] Added sourceUrl column to models.");
+  } catch { /* column already exists — ignore */ }
+  try {
+    sqlite.exec("ALTER TABLE categories ADD COLUMN isPinned integer DEFAULT false NOT NULL;");
+    console.log("[DB Migrate] Added isPinned column to categories.");
   } catch { /* column already exists — ignore */ }
   try {
     sqlite.exec(`CREATE TABLE IF NOT EXISTS trashed_models (

@@ -41,6 +41,7 @@ export const categories = sqliteTable("categories", {
   parentDriveId: text("parentDriveId"),
   path: text("path"),
   sortOrder: integer("sortOrder").default(0).notNull(),
+  isPinned: integer("isPinned", { mode: "boolean" }).default(false).notNull(),
   createdAt: integer("createdAt", { mode: "timestamp_ms" }).default(now).notNull(),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).default(now).notNull(),
 });

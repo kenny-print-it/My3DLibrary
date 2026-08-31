@@ -14,9 +14,21 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v1.3 Beta",
+    date: "August 2026",
+    label: "Current",
+    entries: [
+      { type: "feat", text: "Collections, Tabs, and Compact List layouts — browse by expandable collection sections, jump between horizontal category tabs, or use dense model rows" },
+      { type: "feat", text: "Compact List sorting — sort by model name, collection, tags, or file count; mobile users get the same choices in a selector" },
+      { type: "feat", text: "Pinned collections — owners can pin favorite collections so they stay first in Collections and Tabs" },
+      { type: "feat", text: "Collection covers — collection headers and selected Tabs use an existing model hero image as a banner, with a graceful fallback when no render exists" },
+      { type: "feat", text: "Remembered browsing preferences — chosen layout, selected tab, Compact List sort, and Recently Added visibility are saved on the device" },
+      { type: "feat", text: "Recently Added can now be collapsed when you prefer a more compact library page" },
+    ],
+  },
+  {
     version: "v1.2 Beta",
     date: "July 2026",
-    label: "Current",
     entries: [
       { type: "improve", text: "AI provider guidance updated — Ollama is now the recommended free text-and-image option. Groq is retained only as an optional text-only compatibility option because the previously suggested Groq models are being retired and its replacement does not analyse images." },
       { type: "feat", text: "Dual-model AI tagging — separate Text Model (name/file tagging) and Vision Model (hero image analysis)" },

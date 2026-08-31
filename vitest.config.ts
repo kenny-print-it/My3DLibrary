@@ -1,4 +1,4 @@
-// My3DLibrary v1.2 Beta — Vitest configuration
+// My3DLibrary v1.3 Beta — Vitest configuration
 import { defineConfig } from "vitest/config";
 import path from "path";
 
@@ -15,6 +15,6 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    include: ["server/**/*.test.ts", "server/**/*.spec.ts", "client/**/*.test.ts", "client/**/*.spec.ts"],
   },
 });

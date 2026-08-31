@@ -6,12 +6,13 @@ import { trpc } from "@/lib/trpc";
 import {
   Search, Filter, X, Heart, Box, FolderOpen, RefreshCw,
   ArrowUpDown, CheckCheck, ChevronDown, ChevronRight,
-  GripVertical, LayoutList, Settings, Archive,
+  GripVertical, LayoutList, LayoutGrid, Pin, Settings, Archive,
   CheckSquare, Square, Tags, Plus, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Autoplay from "embla-carousel-autoplay";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 import { Clock } from "lucide-react";
@@ -41,6 +42,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { normalizeCategoryTab, normalizeLibraryView, type LibraryViewMode } from "@/lib/libraryView";
+import { sortCollectionGroups } from "@/lib/categoryOrdering";
+import { pickCollectionCover } from "@/lib/categoryCover";
+import { sortCompactModels, type CompactListSortDirection, type CompactListSortField } from "@/lib/compactListSorting";
+import { CategoryCoverSurface } from "@/components/CategoryCoverSurface";
 
 // Local version: images served directly from local filesystem
 function getModelImageUrl(images: any[] | null | undefined, heroImage: string | null | undefined, _size: number): string | null {
@@ -201,6 +207,9 @@ function ModelCardSkeleton() {
 const FILE_TYPES = ["stl", "3mf", "obj", "step"];
 
 const COLLAPSED_KEY = "printlib_collapsed_categories";
+const LIBRARY_VIEW_KEY = "printlib_library_view";
+const CATEGORY_TAB_KEY = "printlib_active_category_tab";
+const RECENTLY_ADDED_COLLAPSED_KEY = "printlib_recently_added_collapsed";
 
 function useCategoryCollapse() {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
@@ -328,33 +337,41 @@ function VirtualModelGrid({
 function SortableCategoryRow({
   group,
   isReordering,
+  isAdmin,
   collapsed,
   toggle,
   onNavigate,
   onViewAll,
+  onTogglePin,
+  isPinPending = false,
   selectMode = false,
   selectedModels,
   onToggleSelect,
 }: {
   group: { category: any; models: any[] };
   isReordering: boolean;
+  isAdmin: boolean;
   collapsed: Set<string>;
   toggle: (id: string) => void;
   onNavigate: (path: string) => void;
   onViewAll: (id: number) => void;
+  onTogglePin: (category: any) => void;
+  isPinPending?: boolean;
   selectMode?: boolean;
   selectedModels?: Set<number>;
   onToggleSelect?: (id: number) => void;
 }) {
   const catKey = String(group.category.id);
   const isCollapsed = collapsed.has(catKey);
+  const coverImage = pickCollectionCover(group.models, (model) => getModelImageUrl(model.images, model.heroImage, 900));
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.category.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
     <div ref={setNodeRef} style={style} className="mb-10">
       <Collapsible open={!isCollapsed} onOpenChange={() => !isReordering && toggle(catKey)}>
-        <div className="flex items-center gap-3 mb-4">
+        <CategoryCoverSurface imageUrl={coverImage} className="mb-4">
+        <div className="flex min-h-20 items-center gap-3 px-3 py-3">
           {/* Drag handle — only visible in reorder mode */}
           {isReordering && (
             <button
@@ -383,13 +400,16 @@ function SortableCategoryRow({
           <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full transition-colors", isCollapsed ? "bg-primary/15 text-primary" : "text-muted-foreground")}>
             {group.models.length} model{group.models.length !== 1 ? "s" : ""}
           </span>
+          {group.category.isPinned && <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-500"><Pin className="w-2.5 h-2.5 fill-current" /> Pinned</span>}
           <div className="flex-1 h-px bg-border/50" />
+          {isAdmin && !isReordering && group.category.id > 0 && <button onClick={() => onTogglePin(group.category)} disabled={isPinPending} className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50" title={group.category.isPinned ? "Unpin collection" : "Pin collection to the front"}><Pin className={cn("w-3.5 h-3.5", group.category.isPinned && "fill-current text-amber-500")} /><span className="hidden sm:inline">{group.category.isPinned ? "Unpin" : "Pin"}</span></button>}
           {!isReordering && (
             <button onClick={() => onViewAll(group.category.id)} className="text-xs text-primary hover:text-primary/80 transition-colors">
               View all
             </button>
           )}
         </div>
+        </CategoryCoverSurface>
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-none">
           <VirtualModelGrid models={group.models} isReordering={isReordering} onNavigate={onNavigate} selectMode={selectMode} selectedModels={selectedModels} onToggleSelect={onToggleSelect} />
         </CollapsibleContent>
@@ -426,6 +446,10 @@ function CategoryGallery({
 
   const reorder = trpc.categories.reorder.useMutation({
     onSuccess: () => utils.categories.list.invalidate(),
+  });
+  const setPinned = trpc.categories.setPinned.useMutation({
+    onSuccess: () => utils.categories.list.invalidate(),
+    onError: () => toast.error("Could not update the collection pin."),
   });
 
   const sensors = useSensors(
@@ -509,6 +533,9 @@ function CategoryGallery({
               toggle={toggle}
               onNavigate={onNavigate}
               onViewAll={onViewAll}
+              isAdmin={isAdmin}
+              onTogglePin={(category) => setPinned.mutate({ id: category.id, isPinned: !category.isPinned })}
+              isPinPending={setPinned.isPending}
               selectMode={selectMode}
               selectedModels={selectedModels}
               onToggleSelect={onToggleSelect}
@@ -518,6 +545,27 @@ function CategoryGallery({
       </DndContext>
     </>
   );
+}
+
+function CompactModelList({ models, onNavigate, sortField, sortDirection, onSort, categoryLabels }: { models: any[]; onNavigate: (path: string) => void; sortField: CompactListSortField; sortDirection: CompactListSortDirection; onSort: (field: CompactListSortField) => void; categoryLabels: Map<number, string> }) {
+  const sortedModels = useMemo(() => sortCompactModels(models, sortField, sortDirection, categoryLabels), [models, sortField, sortDirection, categoryLabels]);
+  const headers: Array<[CompactListSortField, string]> = [["name", "Model"], ["collection", "Collection"], ["tags", "Tags"], ["files", "Files"]];
+  return <div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
+    <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(7rem,1fr)_minmax(8rem,1fr)_4rem] gap-3 border-b border-border/50 bg-secondary/50 px-4 py-2 sm:grid">
+      {headers.map(([field, label]) => <button key={field} onClick={() => onSort(field)} className="flex items-center gap-1 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground">{label}<ArrowUpDown className="h-3 w-3" /></button>)}
+    </div>
+    <div className="sm:hidden border-b border-border/50 px-3 py-2"><select value={`${sortField}:${sortDirection}`} onChange={(event) => { const [field, direction] = event.target.value.split(":") as [CompactListSortField, CompactListSortDirection]; if (field) { onSort(field); if (direction !== sortDirection) onSort(field); } }} className="w-full rounded-md border border-border/50 bg-background px-2 py-1 text-xs text-foreground"><option value="name:asc">Model Name A–Z</option><option value="name:desc">Model Name Z–A</option><option value="collection:asc">Collection A–Z</option><option value="collection:desc">Collection Z–A</option><option value="tags:asc">Tags A–Z</option><option value="files:desc">Most Files</option></select></div>
+    {sortedModels.map((model) => { const thumb = getModelImageUrl(model.images, model.heroImage, 160); const collection = categoryLabels.get(model.categoryId ?? -1) ?? "Uncategorized"; return <button key={model.id} onClick={() => onNavigate(`/model/${model.id}`)} className="grid w-full grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-3 border-b border-border/40 px-3 py-2.5 text-left hover:bg-secondary/50 sm:grid-cols-[minmax(0,1.6fr)_minmax(7rem,1fr)_minmax(8rem,1fr)_4rem] sm:px-4"><div className="sm:contents"><div className="flex min-w-0 items-center gap-3"><div className="h-11 w-14 shrink-0 overflow-hidden rounded-md bg-muted">{thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <Box className="m-3 h-5 w-5 text-muted-foreground/50" />}</div><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{model.name}</p><p className="truncate text-xs text-muted-foreground sm:hidden">{collection} · {model.fileCount ?? 0} files</p></div></div><span className="hidden truncate text-xs text-muted-foreground sm:block">{collection}</span><span className="hidden truncate text-xs text-muted-foreground sm:block">{model.tags?.map((tag: any) => tag.name).join(", ") || "No tags"}</span><span className="hidden text-xs text-muted-foreground sm:block">{model.fileCount ?? 0}</span></div></button>; })}
+  </div>;
+}
+
+function CategoryTabsBrowser({ groups, activeTab, onTabChange, onNavigate, sortField, sortDirection, onSort, categoryLabels }: { groups: { category: any; models: any[] }[]; activeTab: string; onTabChange: (value: string) => void; onNavigate: (path: string) => void; sortField: CompactListSortField; sortDirection: CompactListSortDirection; onSort: (field: CompactListSortField) => void; categoryLabels: Map<number, string> }) {
+  const allModels = groups.flatMap((group) => group.models);
+  const selectedGroup = activeTab === "all" ? null : groups.find((group) => String(group.category.id) === activeTab);
+  const visibleModels = selectedGroup?.models ?? allModels;
+  const label = selectedGroup ? (selectedGroup.category.customLabel || selectedGroup.category.name) : "All Collections";
+  const cover = selectedGroup ? pickCollectionCover(selectedGroup.models, (model) => getModelImageUrl(model.images, model.heroImage, 1200)) : undefined;
+  return <Tabs value={activeTab} onValueChange={onTabChange} className="gap-0"><div className="sticky top-14 z-20 -mx-4 mb-5 border-y border-border/50 bg-background/95 px-4 py-2.5 backdrop-blur-md sm:mx-0 sm:rounded-xl sm:border"><div className="overflow-x-auto"><TabsList className="h-auto w-max max-w-none gap-1 bg-secondary/70 p-1"><TabsTrigger value="all" className="h-8 gap-1.5 px-3 text-xs">All <span>{allModels.length}</span></TabsTrigger>{groups.map((group) => <TabsTrigger key={group.category.id} value={String(group.category.id)} className="h-8 gap-1.5 px-3 text-xs"><span className="max-w-32 truncate">{group.category.customLabel || group.category.name}</span>{group.category.isPinned && <Pin className="h-3 w-3 fill-amber-500 text-amber-500" />}<span>{group.models.length}</span></TabsTrigger>)}</TabsList></div></div><TabsContent value={activeTab} className="mt-0"><CategoryCoverSurface imageUrl={cover} className="mb-4"><div className="min-h-24 px-4 py-5"><h2 className="text-xl font-semibold text-foreground">{label}</h2><p className="text-sm text-muted-foreground">{visibleModels.length} models</p></div></CategoryCoverSurface><CompactModelList models={visibleModels} onNavigate={onNavigate} sortField={sortField} sortDirection={sortDirection} onSort={onSort} categoryLabels={categoryLabels} /></TabsContent></Tabs>;
 }
 
 export default function Home() {
@@ -543,6 +591,11 @@ export default function Home() {
     } catch {}
     return "name_asc";
   });
+  const [libraryView, setLibraryView] = useState<LibraryViewMode>(() => { try { return normalizeLibraryView(localStorage.getItem(LIBRARY_VIEW_KEY)); } catch { return "collections"; } });
+  const [activeCategoryTab, setActiveCategoryTab] = useState(() => { try { return localStorage.getItem(CATEGORY_TAB_KEY) || "all"; } catch { return "all"; } });
+  const [recentlyAddedCollapsed, setRecentlyAddedCollapsed] = useState(() => { try { return localStorage.getItem(RECENTLY_ADDED_COLLAPSED_KEY) === "true"; } catch { return false; } });
+  const [compactSortField, setCompactSortField] = useState<CompactListSortField>(() => { try { const value = localStorage.getItem("printlib_compact_sort_field"); return value === "collection" || value === "tags" || value === "files" ? value : "name"; } catch { return "name"; } });
+  const [compactSortDirection, setCompactSortDirection] = useState<CompactListSortDirection>(() => { try { return localStorage.getItem("printlib_compact_sort_direction") === "desc" ? "desc" : "asc"; } catch { return "asc"; } });
   const handleSortChange = (v: string) => {
     const sort = v as SortOption;
     setSortBy(sort);
@@ -572,6 +625,10 @@ export default function Home() {
     () => categories.filter((c) => !c.parentDriveId),
     [categories]
   );
+  const categoryLabels = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.customLabel || category.name])),
+    [categories]
+  );
 
   const isFiltered = !!(search || selectedCategory || selectedTags.length > 0 || selectedFileType || favoritesOnly);
   const activeFilterCount = (selectedCategory ? 1 : 0) + selectedTags.length + (selectedFileType ? 1 : 0);
@@ -588,8 +645,15 @@ export default function Home() {
     }
     const result = Array.from(map.values()).filter((g) => g.models.length > 0);
     if (uncategorized.length > 0) result.push({ category: { id: -1, name: "Uncategorized", customLabel: null }, models: uncategorized });
-    return result;
+    return sortCollectionGroups(result);
   }, [models, topCategories, isFiltered]);
+
+  const categoryTabIds = useMemo(() => grouped?.map((group) => String(group.category.id)) ?? [], [grouped]);
+  useEffect(() => { const next = normalizeCategoryTab(activeCategoryTab, categoryTabIds); if (next !== activeCategoryTab) setActiveCategoryTab(next); }, [activeCategoryTab, categoryTabIds]);
+  const saveLibraryView = (view: LibraryViewMode) => { setLibraryView(view); try { localStorage.setItem(LIBRARY_VIEW_KEY, view); } catch {} };
+  const saveActiveTab = (value: string) => { setActiveCategoryTab(value); try { localStorage.setItem(CATEGORY_TAB_KEY, value); } catch {} };
+  const saveCompactSort = (field: CompactListSortField) => { const direction = field === compactSortField ? (compactSortDirection === "asc" ? "desc" : "asc") : "asc"; setCompactSortField(field); setCompactSortDirection(direction); try { localStorage.setItem("printlib_compact_sort_field", field); localStorage.setItem("printlib_compact_sort_direction", direction); } catch {} };
+  const toggleRecentlyAdded = () => setRecentlyAddedCollapsed((current) => { const next = !current; try { localStorage.setItem(RECENTLY_ADDED_COLLAPSED_KEY, String(next)); } catch {} return next; });
 
   // isConfigured: false means no library paths set up yet (first-run state)
   const isConfigured = scanStatus?.isConfigured !== false; // default true until data loads
@@ -1119,7 +1183,9 @@ export default function Home() {
           <div className="flex items-center gap-2 mb-3">
             <Clock className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Recently Added</h2>
+            <button onClick={toggleRecentlyAdded} className="ml-auto text-xs text-muted-foreground hover:text-foreground">{recentlyAddedCollapsed ? "Show" : "Hide"}</button>
           </div>
+          {!recentlyAddedCollapsed && (
           <Carousel
             opts={{ align: "start", dragFree: true, loop: true }}
             plugins={[Autoplay({ delay: 3000, stopOnInteraction: false, stopOnMouseEnter: true })]}
@@ -1172,6 +1238,7 @@ export default function Home() {
             <CarouselPrevious className="-left-4 hidden sm:flex" />
             <CarouselNext className="-right-4 hidden sm:flex" />
           </Carousel>
+          )}
         </div>
       )}
 
@@ -1277,7 +1344,12 @@ export default function Home() {
       )}
 
       {/* Grouped by category */}
-      {!modelsLoading && grouped && <CategoryGallery groups={grouped} onNavigate={navigate} onViewAll={setSelectedCategory} isAdmin={isAdmin} selectMode={bulkMode} selectedModels={selectedModels} onToggleSelect={toggleModelSelection} />}
+      {!modelsLoading && grouped && <>
+        <div className="mb-5 flex items-center justify-between rounded-xl border border-border/50 bg-card/50 px-3 py-2.5"><span className="text-xs font-medium text-foreground">Browse layout</span><div className="inline-flex rounded-lg border border-border/60 bg-secondary/70 p-1"><button onClick={() => saveLibraryView("collections")} className={cn("rounded-md px-3 py-1.5 text-xs", libraryView === "collections" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>Collections</button><button onClick={() => saveLibraryView("tabs")} className={cn("rounded-md px-3 py-1.5 text-xs", libraryView === "tabs" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground")}>Tabs</button><button onClick={() => saveLibraryView("list")} className={cn("rounded-md px-3 py-1.5 text-xs", libraryView === "list" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground")}>Compact List</button></div></div>
+        {libraryView === "collections" && <CategoryGallery groups={grouped} onNavigate={navigate} onViewAll={setSelectedCategory} isAdmin={isAdmin} selectMode={bulkMode} selectedModels={selectedModels} onToggleSelect={toggleModelSelection} />}
+        {libraryView === "tabs" && <CategoryTabsBrowser groups={grouped} activeTab={normalizeCategoryTab(activeCategoryTab, categoryTabIds)} onTabChange={saveActiveTab} onNavigate={navigate} sortField={compactSortField} sortDirection={compactSortDirection} onSort={saveCompactSort} categoryLabels={categoryLabels} />}
+        {libraryView === "list" && <CompactModelList models={models} onNavigate={navigate} sortField={compactSortField} sortDirection={compactSortDirection} onSort={saveCompactSort} categoryLabels={categoryLabels} />}
+      </>}
 
       {/* Hidden STLViewer for bulk thumbnail generation */}
       {bulkThumbState?.running && bulkThumbState.current < bulkThumbState.queue.length && (

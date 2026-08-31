@@ -1,4 +1,4 @@
-// My3DLibrary v1.2 Beta — Drizzle ORM configuration
+// My3DLibrary v1.3 Beta — Drizzle ORM configuration
 import { defineConfig } from "drizzle-kit";
 import path from "path";
 

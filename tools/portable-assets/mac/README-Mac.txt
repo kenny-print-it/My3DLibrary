@@ -1,4 +1,4 @@
-My3DLibrary v1.2 Beta (Build 18) — macOS Portable
+My3DLibrary v1.3 Beta (Build 1) — macOS Portable
 ==================================================
 
 GETTING STARTED
@@ -7,6 +7,12 @@ GETTING STARTED
 2. Move My3DLibrary.app to Applications or another normal folder.
 3. On first launch, Control-click My3DLibrary.app and choose Open if macOS displays a security warning.
 4. Your browser opens to the local My3DLibrary app. Add your model folder in Settings.
+
+LIBRARY BROWSING
+----------------
+Choose **Collections**, **Tabs**, or **Compact List** on the Library page. Tabs let you jump between collections without scrolling; Compact List provides sortable model name, collection, tags, and files columns. Owners can pin favorite collections first, and categories use a model’s existing hero image as a cover banner when available.
+
+Recently Added can be hidden, and your library view, active tab, sorting, and visibility choices are remembered on that computer.
 
 FREE LOCAL AI (OPTIONAL)
 ------------------------

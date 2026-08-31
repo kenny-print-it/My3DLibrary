@@ -1,16 +1,16 @@
 /**
  * package-mac.mjs
- * Builds My3DLibrary-Mac-v1.2-Beta.zip using:
+ * Builds My3DLibrary-Mac-v1.3-Beta.zip using:
  * - New dist/ (freshly built frontend + server bundle)
  * - Existing MacOS launcher, AppIcon, runtime (node-x64 + node-arm64), node_modules_arm64
  */
 import { execSync } from "child_process";
 import { existsSync, mkdirSync, rmSync, cpSync } from "fs";
 
-const PORTABLE = "/home/ubuntu/printlib-portable";
+const PORTABLE = "/home/ubuntu/My3DLibrary-src";
 const MAC_EXTRAS = "/tmp/mac-extras";
 const STAGING = "/tmp/mac-staging";
-const OUT = "/home/ubuntu/My3DLibrary-Mac-v1.2-Beta.zip";
+const OUT = "/home/ubuntu/My3DLibrary-Mac-v1.3-Beta.zip";
 
 console.log("📦 Packaging Mac ZIP...");
 
@@ -42,6 +42,7 @@ cpSync(`${PORTABLE}/dist`, `${APP}/Resources/dist`, { recursive: true });
 
 // 7. Source-controlled current README-Mac.txt (root level)
 cpSync("tools/portable-assets/mac/README-Mac.txt", `${STAGING}/README-Mac.txt`);
+cpSync("README-PORTABLE.md", `${STAGING}/README-PORTABLE.md`);
 
 // 8. Create the ZIP
 if (existsSync(OUT)) rmSync(OUT);

@@ -575,13 +575,13 @@ export default function Settings() {
       if (reTagging) return 1000;
       return false;
     },
-    onSuccess: (d) => {
-      if (!d.inProgress && reTagging) {
-        setReTagging(false);
-        utils.tags.list.invalidate();
-      }
-    },
   });
+  React.useEffect(() => {
+    if (autoTagProgress && !autoTagProgress.inProgress && reTagging) {
+      setReTagging(false);
+      utils.tags.list.invalidate();
+    }
+  }, [autoTagProgress, reTagging, utils]);
 
   const createTag = trpc.tags.create.useMutation({
     onSuccess: () => { utils.tags.list.invalidate(); setNewTagName(""); toast.success("Tag created"); },

@@ -362,6 +362,12 @@ export const appRouter = router({
         await db.reorderCategories(input.orderedIds);
         return { success: true };
       }),
+    setPinned: adminProcedure
+      .input(z.object({ id: z.number(), isPinned: z.boolean() }))
+      .mutation(async ({ input }) => {
+        await db.setCategoryPinned(input.id, input.isPinned);
+        return { success: true };
+      }),
   }),
 
   models: router({

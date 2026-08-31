@@ -7,6 +7,8 @@ vi.mock("./db", () => ({
   getSetting: vi.fn().mockResolvedValue(null),
   setSetting: vi.fn().mockResolvedValue(undefined),
   getAllSettings: vi.fn().mockResolvedValue({}),
+  getLibraryPaths: vi.fn().mockResolvedValue([]),
+  getEnabledLibraryPaths: vi.fn().mockResolvedValue([]),
   getAllCategories: vi.fn().mockResolvedValue([]),
   getAllModels: vi.fn().mockResolvedValue([]),
   getModelById: vi.fn().mockResolvedValue(null),
@@ -23,6 +25,7 @@ vi.mock("./db", () => ({
   upsertCategory: vi.fn().mockResolvedValue(undefined),
   upsertModel: vi.fn().mockResolvedValue(undefined),
   updateCategoryLabel: vi.fn().mockResolvedValue(undefined),
+  setCategoryPinned: vi.fn().mockResolvedValue(undefined),
   updateModelMeta: vi.fn().mockResolvedValue(undefined),
   deleteModelsNotIn: vi.fn().mockResolvedValue(2),
   deleteCategoriesNotIn: vi.fn().mockResolvedValue(1),
@@ -71,26 +74,23 @@ describe("settings router", () => {
   it("returns default settings when called by admin", async () => {
     const caller = appRouter.createCaller(createAdminCtx());
     const result = await caller.settings.get();
-    expect(result).toHaveProperty("drive_api_key");
-    expect(result).toHaveProperty("drive_folder_id");
+    expect(result).toHaveProperty("library_path");
+    expect(result).toHaveProperty("llm_text_model");
   });
 
   it("saves settings successfully when called by admin", async () => {
     const caller = appRouter.createCaller(createAdminCtx());
     const result = await caller.settings.update({
-      drive_api_key: "test-key",
-      drive_folder_id: "test-folder",
+      library_path: "C:\\Models",
+      app_name: "My3DLibrary",
     });
     expect(result.success).toBe(true);
   });
 
-  it("validates connection successfully when called by admin", async () => {
+  it("returns library paths when called by admin", async () => {
     const caller = appRouter.createCaller(createAdminCtx());
-    const result = await caller.settings.validate({
-      apiKey: "test-key",
-      folderId: "test-folder",
-    });
-    expect(result.valid).toBe(true);
+    const result = await caller.settings.libraryPaths();
+    expect(Array.isArray(result)).toBe(true);
   });
 
   it("blocks viewer from accessing settings", async () => {
@@ -130,6 +130,14 @@ describe("categories router", () => {
     const caller = appRouter.createCaller(createAdminCtx());
     const result = await caller.categories.list();
     expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("allows an admin to pin a collection", async () => {
+    const caller = appRouter.createCaller(createAdminCtx());
+    const result = await caller.categories.setPinned({ id: 3, isPinned: true });
+    const dbMock = await import("./db");
+    expect(result.success).toBe(true);
+    expect(dbMock.setCategoryPinned).toHaveBeenCalledWith(3, true);
   });
 });
 
@@ -200,7 +208,7 @@ describe("access router", () => {
     expect(result.status).toBe("approved");
   });
 
-  it("access.check returns pending for a new viewer (no prior record)", async () => {
+  it("access.check approves a local viewer without an explicit access record", async () => {
     const dbMock = await import("./db");
     vi.mocked(dbMock.upsertAccessRequest).mockResolvedValueOnce({
       id: 1,
@@ -214,7 +222,7 @@ describe("access router", () => {
     });
     const caller = appRouter.createCaller(createViewerCtx());
     const result = await caller.access.check();
-    expect(result.status).toBe("pending");
+    expect(result.status).toBe("approved");
   });
 
   it("access.check returns approved for a viewer whose request was approved", async () => {
@@ -303,48 +311,11 @@ describe("access router", () => {
   });
 });
 
-describe("hard delete on scan", () => {
-  it("calls deleteModelsNotIn and deleteCategoriesNotIn after a successful scan", async () => {
-    const { scanDrive } = await import("./driveScanner");
-    const dbMock = await import("./db");
-
-    // Simulate scan returning 1 model and 1 category
-    vi.mocked(scanDrive).mockResolvedValueOnce({
-      categories: [{ driveId: "cat-1", name: "Beasts and Minis", parentDriveId: "root" }],
-      models: [{
-        driveId: "model-1",
-        name: "Test Model",
-        path: "Root / Beasts and Minis / Test Model",
-        images: [],
-        modelFiles: [],
-        thumbnailUrl: null,
-      }],
-    });
-    vi.mocked(dbMock.getAllCategories).mockResolvedValueOnce([
-      { id: 1, driveId: "cat-1", name: "Beasts and Minis", parentDriveId: "root", customLabel: null, createdAt: new Date(), updatedAt: new Date() },
-    ]);
-
+describe("local scan safety", () => {
+  it("does not start a scan until at least one local library path is configured", async () => {
     const caller = appRouter.createCaller(createAdminCtx());
-    await caller.scan.start();
-
-    // Allow the async scan to complete
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(dbMock.deleteModelsNotIn).toHaveBeenCalledWith(["model-1"]);
-    expect(dbMock.deleteCategoriesNotIn).toHaveBeenCalledWith(["cat-1"]);
-  });
-
-  it("deleteModelsNotIn is called with empty array when scan finds no models", async () => {
-    const { scanDrive } = await import("./driveScanner");
-    const dbMock = await import("./db");
-
-    vi.mocked(scanDrive).mockResolvedValueOnce({ categories: [], models: [] });
-
-    const caller = appRouter.createCaller(createAdminCtx());
-    await caller.scan.start();
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(dbMock.deleteModelsNotIn).toHaveBeenCalledWith([]);
-    expect(dbMock.deleteCategoriesNotIn).toHaveBeenCalledWith([]);
+    const result = await caller.scan.start();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/No library paths configured/);
   });
 });

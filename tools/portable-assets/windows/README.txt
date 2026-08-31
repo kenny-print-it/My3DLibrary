@@ -1,4 +1,4 @@
-My3DLibrary v1.2 Beta (Build 10) — Windows Portable
+My3DLibrary v1.3 Beta (Build 1) — Windows Portable
 ====================================================
 
 GETTING STARTED
@@ -7,6 +7,12 @@ GETTING STARTED
 2. Double-click My3DLibrary.exe.
 3. Your browser opens to the local My3DLibrary app.
 4. In Settings, add the folder or drive that contains your 3D-model folders.
+
+LIBRARY BROWSING
+----------------
+Choose **Collections**, **Tabs**, or **Compact List** on the Library page. Tabs let you jump between collections without scrolling; Compact List provides sortable model name, collection, tags, and files columns. Owners can pin favorite collections first, and categories use a model’s existing hero image as a cover banner when available.
+
+Recently Added can be hidden, and your library view, active tab, sorting, and visibility choices are remembered on that computer.
 
 AI AUTO-TAGGING (OPTIONAL)
 ---------------------------
