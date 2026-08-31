@@ -1,4 +1,4 @@
-My3DLibrary v1.3 Beta (Build 1) — Windows Portable
+My3DLibrary v1.3 Beta (Build 2) — Windows Portable
 ====================================================
 
 GETTING STARTED
@@ -18,7 +18,7 @@ AI AUTO-TAGGING (OPTIONAL)
 ---------------------------
 My3DLibrary works without AI. AI can suggest tags from model names, filenames, and existing render images.
 
-The recommended free option is local Ollama. It runs on your computer, keeps your images private, works offline after setup, and supports both text tags and image analysis.
+The best private/free option is local Ollama. It runs on your computer, keeps your images private, works offline after setup, and supports both text tags and image analysis.
 
 1. Open the My3DLibrary-Portable folder.
 2. Run Download-AI-Model.bat.
@@ -29,11 +29,17 @@ The included setup selects two models:
 - Text model: llama3.2 (or llama3.2:3b in CPU mode)
 - Vision model: gemma3:4b in GPU mode, or moondream in CPU mode
 
+GEMINI ONLINE AI
+----------------
+If you prefer not to download AI models, use **Google Gemini** from the AI Setup Guide. Create your own key at https://aistudio.google.com/apikey, choose **Google Gemini (online, free tier)**, confirm the privacy notice, then paste your key and click Save & Lock.
+
+Gemini supports both text tags and render-image selection. It uses your own Google free-tier quota, which is limited and may change. Selected render thumbnails are sent to Google for AI analysis. Use Ollama instead if you want images to stay on your computer.
+
 GROQ NOTE
 ---------
 Groq is no longer recommended for the complete AI workflow. The Groq models previously suggested by My3DLibrary are being retired. Groq's replacement model is text-only, so it can suggest tags from names and filenames but cannot analyse render images or choose a hero image.
 
-If you use Groq anyway, configure it only for text tagging. For free text-and-image AI, use the included Ollama setup.
+If you use Groq anyway, configure it only for legacy text tagging. For online text-and-image AI, use Gemini; for private offline AI, use the included Ollama setup.
 
 THUMBNAILS
 ----------

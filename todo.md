@@ -13,3 +13,13 @@
 - [x] Include the current README-PORTABLE.md in both platform ZIPs and correct its thumbnail description
 - [x] Build and verify the v1.3 Windows and Mac beta ZIPs before publication
 - [x] Publish the v1.3 beta source and new Windows/Mac Build 1 ZIPs while preserving prior v1.2 assets
+
+## Online Vision AI Research
+- [x] Evaluate free online vision-AI providers that can select the best existing model render in the Windows and Mac portable apps
+- [x] Recommend a safe user-provided-key or limited shared-service configuration for an online image-selection option
+
+## Gemini Online AI Option
+- [x] Add a Google Gemini online preset for text and image selection using the user’s own API key
+- [x] Add clear in-app confirmation that render images are sent to Google and free-tier availability is quota-limited
+- [x] Update the GitHub README, portable readmes, and in-app changelog to recommend Gemini online and limit Groq to legacy text-only use
+- [ ] Build, verify, and publish refreshed Windows and Mac v1.3 beta packages without removing the original Build 1 assets

@@ -4,15 +4,26 @@ All notable changes to My3DLibrary are documented here.
 
 ---
 
-## [Next portable build] — AI provider guidance update
+## [v1.3.0-beta] — 2026-08-31
+
+### New Features
+
+**Collections, Tabs, and Compact List browsing**
+Choose expandable collection sections, a horizontal category-tab browser, or dense Compact List rows. Compact List sorts by model name, collection, tags, or file count. Your selected layout, active tab, sort choice, and Recently Added visibility are remembered on the device.
+
+**Pinned collections and cover banners**
+Owners can pin favorite collections so they remain first. Collection sections and selected Tabs use an existing model hero image as a cover banner when available, with a graceful fallback when no render exists.
+
+**Google Gemini online AI**
+The AI Setup Guide now offers Google Gemini as the recommended online option. It uses one user-owned Gemini API key for both text tags and existing render-image selection. The guide asks for privacy confirmation before selected render thumbnails are sent to Google, and explains that free-tier quotas are limited.
 
 ### Changed
 
 **Ollama is now the recommended free AI option.** The portable app's setup guide now recommends the fully local Ollama configuration for text-and-image AI: `llama3.2` for name/file-list tag suggestions and `gemma3:4b` for hero-image analysis. CPU-only users can continue to use the smaller `moondream` vision model.
 
-**Groq is now clearly marked as an optional text-only provider.** The Groq models previously prefilled by My3DLibrary are being retired. Groq's suggested replacement, `openai/gpt-oss-20b`, is a text model, so it can suggest tags from model names and filenames but cannot inspect a render image or select a hero image. The app therefore fills the same model into both fields to intentionally skip the image pass.
+**Groq is now clearly marked as a legacy text-only provider.** The Groq models previously prefilled by My3DLibrary are being retired. Groq's suggested replacement, `openai/gpt-oss-20b`, is a text model, so it can suggest tags from model names and filenames but cannot inspect a render image or select a hero image. Gemini is the recommended online text-and-image alternative.
 
-**Why Groq is no longer the default.** A complete free AI setup needs both text and vision capability. A cloud provider's free quotas, supported models, and pricing may change, whereas the local Ollama option keeps the full text-and-image workflow private, offline, and free after the model download.
+**Why Groq is no longer the default.** A complete AI setup needs both text and vision capability. A cloud provider's free quotas, supported models, and pricing may change, whereas the local Ollama option keeps the full text-and-image workflow private, offline, and free after the model download.
 
 ---
 

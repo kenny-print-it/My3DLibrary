@@ -72,8 +72,9 @@ AI tagging automatically describes and tags your 3D models by analysing their th
 
 | Option | Cost | GPU Required | Best For |
 |--------|------|-------------|---------|
-| **Ollama (local)** ⭐ Recommended | Free after download | Optional | Full text + image AI, offline, private |
-| **Groq** | Provider-controlled quota/pricing | No | Optional text-only tags only |
+| **Ollama (local)** ⭐ Best for privacy | Free after download | Optional | Full text + image AI, offline, private |
+| **Google Gemini** ⭐ Best online option | User's free tier, subject to quota | No | Online text + image AI, no model download |
+| **Groq** | Provider-controlled quota/pricing | No | Legacy text-only tags only |
 | **OpenAI** | ~$0.01/model | No | Highest quality |
 | **LM Studio** | Free | Recommended | Local, any OpenAI-compatible model |
 
@@ -81,10 +82,10 @@ AI tagging automatically describes and tags your 3D models by analysing their th
 
 In **Settings → AI / LLM Configuration**, click **"AI Setup Guide"** to open the interactive setup wizard.
 
-Each option (A–D) is a collapsible card. Click any card to expand it and read the instructions. At the bottom of each card is a **"Use This Option — Auto-fill Settings"** button that:
+Each option is a collapsible card. Click any card to expand it and read the instructions. At the bottom of each card is a **"Use This Option — Auto-fill Settings"** button that:
 - Fills in the API URL, text model, and vision model fields automatically
 - Opens the settings form in edit mode so you can review the values
-- Leaves the API key blank for options that need one (Groq, OpenAI)
+- Leaves the API key blank for options that need one (Gemini, Groq, OpenAI)
 
 ### Option A — Ollama (Free Local AI, Offline)
 
@@ -97,11 +98,22 @@ Each option (A–D) is a collapsible card. Click any card to expand it and read 
 
 > **Tip:** The models are stored inside the app folder — move the entire folder to another PC or USB drive and it works without re-downloading.
 
-### Option B — Groq (Optional Text-Only Cloud AI)
+### Option B — Google Gemini (Recommended Online AI)
+
+Gemini is the recommended online option when you do not want to download local AI models. It supports both name/file tag suggestions and hero-image selection with one user-owned Gemini API key.
+
+1. Visit [Google AI Studio](https://aistudio.google.com/apikey), sign in, and create a Gemini API key.
+2. Open **Settings → AI / LLM Configuration → AI Setup Guide** and choose **Google Gemini (online, free tier)**.
+3. Read and confirm the privacy/free-tier notice, then use the auto-fill button.
+4. Paste your Gemini API key, choose **Save & Lock**, then choose **Check Again** under AI Status.
+
+> **Privacy and quota:** Gemini sends the render thumbnails selected for AI analysis to Google. Its free tier has quotas and availability can change. Use local Ollama instead if you do not want images to leave your computer.
+
+### Option C — Groq (Legacy Text-Only Cloud AI)
 
 Groq is no longer recommended for the complete AI workflow. The models previously suggested by My3DLibrary are being retired, and Groq's suggested replacement, `openai/gpt-oss-20b`, does not analyse images. It can provide text-only suggestions from model names and filenames, but not image-based tags or hero-image selection.
 
-Choose the **Ollama** option for free local text-and-image AI. Choose Groq only if you intentionally want cloud text tagging and have confirmed the provider's current API limits and pricing.
+Choose **Gemini** for online text-and-image AI, or **Ollama** for free private offline AI. Choose Groq only if you intentionally want legacy cloud text tagging.
 
 ---
 
@@ -123,7 +135,7 @@ Close the console window that opened when you launched `My3DLibrary.exe`, or pre
 
 **Antivirus quarantines the exe:** The `.exe` is a bundled Node.js app — it contains no malware. Add the folder to your antivirus exclusions.
 
-**AI tagging not working:** Ensure `ollama.exe` is in the `ollama\` subfolder and that Ollama started successfully (check for a minimised "Ollama" window in the taskbar). The recommended recovery path is the AI Setup Guide's free local Ollama option; Groq is available only for optional text-only tagging.
+**AI tagging not working:** Open the AI Setup Guide and confirm the provider setup. For Ollama, make sure `ollama.exe` is in the `ollama\` subfolder and is running. For Gemini, confirm that your API key is pasted and your free-tier quota is available. Groq is available only for legacy text-only tagging.
 
 **3D viewer shows a blank screen:** The model file may be very large or use an unusual format. Try a different file in the same model folder using the file selector strip.
 

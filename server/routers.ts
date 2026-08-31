@@ -97,7 +97,7 @@ export const appRouter = router({
       // Read model-config.txt written by Download-AI-Model.bat to get recommended defaults
       // Format: text=llama3.2\nvision=llava  (or llama3.2:3b / moondream for CPU mode)
       let recommendedTextModel = "llama3.2";
-      let recommendedVisionModel = "llava";
+      let recommendedVisionModel = "gemma3:4b";
       try {
         const { readFileSync, existsSync } = await import("fs");
         const { join } = await import("path");

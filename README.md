@@ -18,7 +18,7 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 - **Multi-file viewer** — when a model has multiple STL/3MF files, a file selector strip lets you switch between them instantly
 - **Generate Thumbnail** — capture a thumbnail from the 3D viewer with one click; auto-orients to a hero angle or captures your current rotation. A bulk ✦ button generates thumbnails for every model missing renders in one pass
 - **Retake Thumbnail** — hover over any model image and click "Retake Thumbnail" to re-orient the 3D viewer and capture a replacement thumbnail
-- **Auto-tag** models using free local AI (Ollama), with an optional Groq text-only compatibility mode
+- **Auto-tag and choose hero images** with private local Ollama or the optional online Google Gemini free tier; Groq remains legacy text-only
 - **AI Setup Guide** — interactive wizard with one-click auto-fill for all AI provider settings
 - **Search** by name, tag, or collection
 - **Browse your way** — use Collections, category Tabs, or Compact List; pin favorite collections and use existing hero images as collection covers
@@ -27,7 +27,7 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 - **Bulk tag** — apply or remove tags across multiple models at once
 - **Portable** — runs from a USB drive, no install, no admin rights needed
 
-> Your files never leave your computer. My3DLibrary is 100% local.
+> Your library files stay on your computer. Render thumbnails are sent to an AI provider only if you deliberately configure an online AI option such as Google Gemini.
 
 ---
 
@@ -35,8 +35,8 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 
 | Platform | Current build | Download |
 |---|---:|---|
-| Windows | **v1.3 Beta — Build 1** | [Download Windows Build 1](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Windows-v1.3-Beta-build1.zip) |
-| macOS | **v1.3 Beta — Build 1** | [Download Mac Build 1](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Mac-v1.3-Beta-build1.zip) |
+| Windows | **v1.3 Beta — Build 2** | [Download Windows Build 2](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Windows-v1.3-Beta-build2.zip) |
+| macOS | **v1.3 Beta — Build 2** | [Download Mac Build 2](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Mac-v1.3-Beta-build2.zip) |
 
 Previous builds remain available on the [full releases page](https://github.com/kenny-print-it/My3DLibrary/releases).
 
@@ -122,8 +122,9 @@ My3DLibrary can automatically tag your models by looking at their thumbnail imag
 
 | Option | Cost | GPU Required | Setup |
 |--------|------|-------------|-------|
-| **Ollama (local)** ⭐ Recommended | Free after download | Optional | Run `Download-AI-Model.bat` for full text + image AI |
-| **Groq** | Provider-controlled quota/pricing | No | Optional **text-only** tagging with `openai/gpt-oss-20b` |
+| **Ollama (local)** ⭐ Best for privacy | Free after download | Optional | Run `Download-AI-Model.bat` for full offline text + image AI |
+| **Google Gemini** ⭐ Best online option | User’s free tier, subject to quota | No | Add your Gemini API key for online text + image AI |
+| **Groq** | Provider-controlled quota/pricing | No | Legacy **text-only** tagging with `openai/gpt-oss-20b` |
 | **OpenAI** | ~$0.01/model | No | Enter your API key in Settings |
 | **LM Studio** | Free | Recommended | Start the local server, point Settings at `http://localhost:1234/v1` |
 
@@ -131,7 +132,7 @@ My3DLibrary can automatically tag your models by looking at their thumbnail imag
 
 In **Settings → AI / LLM Configuration**, click **"AI Setup Guide"** to open the interactive setup wizard.
 
-Each option (A–D) is a collapsible card with step-by-step instructions. At the bottom of each card is a **"Use This Option — Auto-fill Settings"** button that fills in the API URL, text model, and vision model fields automatically. Just paste your API key (if required) and click Save.
+Each option is a collapsible card with step-by-step instructions. At the bottom of each card is a **"Use This Option — Auto-fill Settings"** button that fills in the API URL, text model, and vision model fields automatically. Just paste your API key (if required) and click Save.
 
 ### Option A — Ollama (Free Local AI, Fully Offline)
 
@@ -146,11 +147,22 @@ Ollama runs entirely on your PC. A GPU is recommended for best performance, but 
 
 > **Tip:** The models are stored inside the app folder — move the entire `My3DLibrary-Portable` folder to another PC or USB drive and it works without re-downloading.
 
-### Option B — Groq (Optional Text-Only Cloud AI)
+### Option B — Google Gemini (Recommended Online AI)
+
+Gemini is the recommended online option when you do not want to download local models. It supports both text-based tag suggestions and image-based hero-image selection through one user-owned API key.
+
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey), sign in, and create a Gemini API key.
+2. In **Settings → AI / LLM Configuration → AI Setup Guide**, open **Google Gemini (online, free tier)**.
+3. Read the privacy/free-tier notice, confirm that you understand it, then choose **Use Gemini — Auto-fill Settings**.
+4. Paste your Gemini API key, click **Save & Lock**, then choose **Check Again** under AI Status.
+
+> **Privacy and quota:** Gemini sends the render thumbnails selected for AI analysis to Google. Its free tier is quota-limited and availability can change. Use local Ollama instead when images must remain on your computer.
+
+### Option C — Groq (Legacy Text-Only Cloud AI)
 
 Groq is no longer recommended as the complete AI option. The Groq models previously prefilled by My3DLibrary are being retired, and Groq's suggested replacement, `openai/gpt-oss-20b`, is a text model. It can suggest tags from model names and filenames, but it cannot analyse render images or select a hero image.
 
-Use the AI Setup Guide's **Groq (cloud, text-only)** option only if you specifically want cloud text tagging. Its API availability, limits, and pricing are controlled by Groq. For free text-and-image AI that works offline, use Ollama instead.
+Use the AI Setup Guide's **Groq (legacy, cloud text-only)** option only if you specifically want cloud text tagging. For online text-and-image AI, use Gemini; for free private offline AI, use Ollama instead.
 
 ---
 
@@ -177,7 +189,7 @@ pnpm run build
 - **Backend:** Node.js, Express, tRPC, Drizzle ORM
 - **Database:** SQLite (via better-sqlite3)
 - **3D Viewer:** Three.js (STL binary/ASCII parser + 3MF parser via fflate)
-- **AI:** Ollama (llama3.2 + moondream/llava) or any OpenAI-compatible API (Groq, OpenAI, LM Studio)
+- **AI:** Ollama (llama3.2 + gemma3:4b/moondream), Google Gemini, or compatible APIs (Groq text-only, OpenAI, LM Studio)
 
 ---
 

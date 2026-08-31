@@ -31,14 +31,15 @@ async function isModelAvailable(): Promise<boolean> {
   }
   try {
     const { data: models } = await listLLMModels();
-    const modelName = ENV.llmModel?.toLowerCase() ?? "";
+    const configuredModel = ENV.llmVisionModel?.trim() || ENV.llmModel?.trim() || "llava";
+    const modelName = configuredModel.toLowerCase();
     const found = models.some(
       (m) => m.id.toLowerCase() === modelName || m.id.toLowerCase().startsWith(modelName)
     );
     if (!found) {
       console.warn(
-        `[ThumbnailPicker] Model '${ENV.llmModel}' not found in Ollama. ` +
-        `Run Download-AI-Model.bat first, then restart. Available: ${models.map(m => m.id).join(", ") || "(none)"}`
+        `[ThumbnailPicker] Vision model '${configuredModel}' is not available. ` +
+        `Use the AI Setup Guide or set the Vision Model field. Available: ${models.map(m => m.id).join(", ") || "(none)"}`
       );
     }
     return found;
@@ -181,6 +182,7 @@ where the number is the 1-based position of the best image.`,
 
   try {
     const response = await invokeLLM({
+      model: ENV.llmVisionModel?.trim() || ENV.llmModel?.trim() || "llava",
       messages: [
         {
           role: "user",

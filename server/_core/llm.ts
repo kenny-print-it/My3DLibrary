@@ -227,9 +227,24 @@ const normalizeToolChoice = (
 const normalizeBaseUrl = (url: string) =>
   url.replace(/\/+$/, "").replace(/\/v\d+$/, "");
 
+export const isGeminiOpenAIEndpoint = (url: string) =>
+  /^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/openai\/?$/i.test(url.trim());
+
+export const resolveChatCompletionsUrl = (url: string) => {
+  const trimmed = url.replace(/\/+$/, "");
+  if (isGeminiOpenAIEndpoint(trimmed)) return `${trimmed}/chat/completions`;
+  return `${normalizeBaseUrl(trimmed)}/v1/chat/completions`;
+};
+
+export const resolveModelsUrl = (url: string) => {
+  const trimmed = url.replace(/\/+$/, "");
+  if (isGeminiOpenAIEndpoint(trimmed)) return `${trimmed.replace(/\/openai$/i, "")}/models`;
+  return `${normalizeBaseUrl(trimmed)}/v1/models`;
+};
+
 const resolveApiUrl = () => {
   if (!ENV.llmApiUrl) throw new Error("LLM not configured. Set LLM_API_URL in your .env file.");
-  return `${normalizeBaseUrl(ENV.llmApiUrl)}/v1/chat/completions`;
+  return resolveChatCompletionsUrl(ENV.llmApiUrl);
 };
 
 const assertApiKey = () => {
@@ -457,10 +472,15 @@ export async function listLLMModels(): Promise<ModelsResponse> {
   assertApiKey();
 
   if (!ENV.llmApiUrl) throw new Error("LLM not configured. Set LLM_API_URL in your .env file.");
-  const url = `${normalizeBaseUrl(ENV.llmApiUrl)}/v1/models`;
+  const isGemini = isGeminiOpenAIEndpoint(ENV.llmApiUrl);
+  const url = resolveModelsUrl(ENV.llmApiUrl);
 
   const response = await fetchWithBackoff(url, {
-    headers: { ...(ENV.llmApiKey ? { authorization: `Bearer ${ENV.llmApiKey}` } : {}) },
+    headers: {
+      ...(ENV.llmApiKey
+        ? (isGemini ? { "x-goog-api-key": ENV.llmApiKey } : { authorization: `Bearer ${ENV.llmApiKey}` })
+        : {}),
+    },
   });
 
   if (!response.ok) {
@@ -470,5 +490,18 @@ export async function listLLMModels(): Promise<ModelsResponse> {
     );
   }
 
-  return (await response.json()) as ModelsResponse;
+  const body = await response.json();
+  if (isGemini) {
+    const models = Array.isArray(body.models) ? body.models : [];
+    return {
+      object: "list",
+      data: models.map((model: { name?: string; displayName?: string }) => ({
+        id: (model.name || model.displayName || "").replace(/^models\//, ""),
+        object: "model",
+        created: 0,
+        owned_by: "google",
+      })).filter((model: ModelInfo) => model.id.length > 0),
+    };
+  }
+  return body as ModelsResponse;
 }

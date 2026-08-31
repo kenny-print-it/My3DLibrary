@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { AI_SETUP_PRESETS, requiresImageUploadConsent, type AIPreset, type AISetupOption } from "@/lib/aiProviderPresets";
 
 const TAG_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316",
@@ -139,13 +140,6 @@ function FolderBrowserDialog({
 }
 
 // ── AI Setup Guide Dialog ──────────────────────────────────────────────────
-interface AIPreset {
-  apiUrl: string;
-  apiKey: string;
-  textModel: string;
-  visionModel: string;
-}
-
 function AISetupGuideDialog({
   open,
   onClose,
@@ -155,17 +149,12 @@ function AISetupGuideDialog({
   onClose: () => void;
   onApply?: (preset: AIPreset) => void;
 }) {
-  const [selectedOption, setSelectedOption] = useState<"A" | "B" | "C" | "D" | null>(null);
+  const [selectedOption, setSelectedOption] = useState<AISetupOption | null>(null);
+  const [geminiConsent, setGeminiConsent] = useState(false);
 
-  const presets: Record<"A" | "B" | "C" | "D", AIPreset> = {
-    A: { apiUrl: "http://localhost:11434", apiKey: "", textModel: "llama3.2", visionModel: "gemma3:4b" },
-    B: { apiUrl: "https://api.groq.com/openai/v1", apiKey: "", textModel: "openai/gpt-oss-20b", visionModel: "openai/gpt-oss-20b" },
-    C: { apiUrl: "https://api.openai.com/v1", apiKey: "", textModel: "gpt-4o-mini", visionModel: "gpt-4o-mini" },
-    D: { apiUrl: "http://localhost:1234/v1", apiKey: "", textModel: "", visionModel: "" },
-  };
-
-  const handleApply = (option: "A" | "B" | "C" | "D") => {
-    onApply?.(presets[option]);
+  const handleApply = (option: AISetupOption) => {
+    if (requiresImageUploadConsent(option) && !geminiConsent) return;
+    onApply?.(AI_SETUP_PRESETS[option]);
     onClose();
   };
 
@@ -268,42 +257,46 @@ function AISetupGuideDialog({
             )}
           </div>
 
-          {/* Option B: Groq — text-only compatibility option */}
+          {/* Option B: Google Gemini — online free-tier option */}
           <div
             className={cn(
               "rounded-xl border transition-all",
-              selectedOption === "B" ? "border-orange-500 bg-orange-500/5" : "border-border/50"
+              selectedOption === "B" ? "border-primary bg-primary/5" : "border-border/50"
             )}
           >
             <button
               className="w-full text-left px-4 pt-4 pb-2 flex items-center gap-2"
               onClick={() => setSelectedOption(selectedOption === "B" ? null : "B")}
             >
-              <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">B</span>
-              <span className="font-semibold text-foreground text-sm">Groq (cloud, text-only)</span>
-              <span className="text-[10px] font-normal text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5">Limited</span>
+              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">B</span>
+              <span className="font-semibold text-foreground text-sm">Google Gemini (online, free tier)</span>
+              <span className="text-[10px] font-normal text-primary bg-primary/10 border border-primary/30 rounded px-1.5 py-0.5">Recommended online</span>
               <ChevronRight className={cn("w-4 h-4 text-muted-foreground ml-auto transition-transform", selectedOption === "B" && "rotate-90")} />
             </button>
             {selectedOption === "B" && (
               <div className="px-4 pb-4 space-y-2.5 text-muted-foreground text-xs">
-                <p>Groq remains an optional cloud service for <strong className="text-foreground">text-only tag suggestions</strong>. It is no longer recommended for the complete AI workflow because the former Groq text and vision models used by My3DLibrary are being retired, and Groq's suggested text replacement does not analyse images.</p>
+                <p>Gemini is the recommended online option when you do not want to download local AI models. One user-owned Gemini API key supports both <strong className="text-foreground">name/file tag suggestions</strong> and <strong className="text-foreground">render-image selection</strong>.</p>
 
-                <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2.5 space-y-1.5">
-                  <p className="font-medium text-amber-400">Why this option is limited</p>
-                  <p>The replacement model, <span className="font-mono">openai/gpt-oss-20b</span>, can tag model names and filenames, but it cannot inspect hero images. Choose Ollama above if you want free local image-based tagging and hero-image analysis.</p>
+                <div className="rounded-lg bg-primary/10 border border-primary/30 px-3 py-2.5 space-y-1.5">
+                  <p className="font-medium text-primary">Step 1 — Create your own Gemini API key</p>
+                  <p>Visit <span className="font-mono text-primary">aistudio.google.com/apikey</span>, sign in with your Google account, and create an API key. The key belongs to you and is stored only in your local My3DLibrary settings.</p>
                 </div>
 
-                <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2.5 space-y-2">
-                  <p className="font-medium text-orange-400">Step 1 — Get your free API key</p>
-                  <p>Go to <span className="font-mono text-primary">console.groq.com</span>, create an API key, and copy the key — it starts with <span className="font-mono">gsk_</span>. Groq availability, quotas, and prices are controlled by Groq and can change.</p>
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2.5 space-y-1.5">
+                  <p className="font-medium text-amber-400">Privacy and free-tier notice</p>
+                  <p>When you use Gemini image selection, My3DLibrary sends the selected render-image thumbnails to Google for analysis. Gemini's free tier is quota-limited, availability can change, and Google may use free-tier content to improve its products. Use Ollama above if you want images to stay on your computer.</p>
+                  <label className="mt-2 flex items-start gap-2 cursor-pointer text-foreground">
+                    <input type="checkbox" checked={geminiConsent} onChange={(event) => setGeminiConsent(event.target.checked)} className="mt-0.5 h-3.5 w-3.5 accent-primary" />
+                    <span>I understand that Gemini sends selected render images to Google and that the free tier has limits.</span>
+                  </label>
                 </div>
 
                 <div className="rounded-lg bg-secondary border border-border/50 px-3 py-2.5 space-y-1.5">
                   <p className="font-medium text-foreground">Settings that will be filled in:</p>
-                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://api.groq.com/openai/v1</span></p>
-                  <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">you'll paste your <span className="font-mono">gsk_…</span> key after closing</span></p>
-                  <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">openai/gpt-oss-20b</span></p>
-                  <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">same as Text Model (image pass disabled)</span></p>
+                  <p><span className="font-medium text-foreground">API URL:</span> <span className="font-mono">https://generativelanguage.googleapis.com/v1beta/openai/</span></p>
+                  <p><span className="font-medium text-foreground">API Key:</span> <span className="italic">paste your Gemini API key after closing</span></p>
+                  <p><span className="font-medium text-foreground">Text Model:</span> <span className="font-mono">gemini-2.5-flash</span></p>
+                  <p><span className="font-medium text-foreground">Vision Model:</span> <span className="font-mono">gemini-2.5-flash</span></p>
                 </div>
 
                 <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-2.5">
@@ -314,9 +307,10 @@ function AISetupGuideDialog({
                 {onApply && (
                   <button
                     onClick={() => handleApply("B")}
-                    className="w-full mt-1 px-4 py-2 rounded-lg text-xs font-semibold bg-orange-500 text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                    disabled={!geminiConsent}
+                    className="w-full mt-1 px-4 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center gap-2"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Use Text-Only Groq — Auto-fill Settings
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Use Gemini — Auto-fill Settings
                   </button>
                 )}
               </div>
@@ -842,7 +836,7 @@ export default function Settings() {
               <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold text-foreground">AI / LLM Configuration</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Used for auto-tagging and thumbnail selection. Supports Ollama, OpenAI, LM Studio, and more.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Used for auto-tagging and thumbnail selection. Supports local Ollama, Google Gemini, and other compatible providers.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -913,7 +907,7 @@ export default function Settings() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">API Key <span className="text-muted-foreground/50">(leave blank for Ollama/local)</span></label>
+                      <label className="text-xs font-medium text-muted-foreground">API Key <span className="text-muted-foreground/50">(leave blank only for local providers)</span></label>
                       <div className="relative">
                         <input
                           type={showLlmKey ? "text" : "password"}
@@ -1040,7 +1034,7 @@ export default function Settings() {
                           <AlertCircle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
                           <div>
                             <p className="text-sm font-medium text-orange-300">Text model not found: <span className="font-mono">{name}</span></p>
-                            <p className="text-xs text-muted-foreground mt-0.5">Run <span className="font-mono">Download-AI-Model.bat</span> or set the Text Model field above.</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Use the Setup Guide to install a local model or choose the right online model.</p>
                           </div>
                         </div>
                       );
@@ -1062,7 +1056,7 @@ export default function Settings() {
                           <AlertCircle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
                           <div>
                             <p className="text-sm font-medium text-orange-300">Vision model not found: <span className="font-mono">{name}</span></p>
-                            <p className="text-xs text-muted-foreground mt-0.5">Run <span className="font-mono">Download-AI-Model.bat</span> or set the Vision Model field above.</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Use the Setup Guide to install a local model or choose the right online vision model.</p>
                           </div>
                         </div>
                       );
@@ -1070,7 +1064,7 @@ export default function Settings() {
                     {/* Available models list (shown when any model is missing) */}
                     {(!llmStatus.textModelAvailable || !llmStatus.visionModelAvailable) && llmStatus.availableModels && llmStatus.availableModels.length > 0 && (
                       <div className="rounded-lg bg-secondary border border-border/50 px-4 py-3">
-                        <p className="text-xs font-medium text-muted-foreground mb-2">Models available in Ollama — click to set as Text or Vision model:</p>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Models reported by your configured provider — click to set as Text or Vision model:</p>
                         <div className="flex flex-wrap gap-2">
                           {llmStatus.availableModels.map((m) => (
                             <div key={m} className="flex gap-1">

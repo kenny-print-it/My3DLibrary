@@ -18,6 +18,7 @@ const RELEASES: Release[] = [
     date: "August 2026",
     label: "Current",
     entries: [
+      { type: "improve", text: "Google Gemini online AI — the recommended online setup supports both text tags and render-image selection using your own Gemini API key and free-tier quota. The Setup Guide asks for clear privacy confirmation before render thumbnails are sent to Google." },
       { type: "feat", text: "Collections, Tabs, and Compact List layouts — browse by expandable collection sections, jump between horizontal category tabs, or use dense model rows" },
       { type: "feat", text: "Compact List sorting — sort by model name, collection, tags, or file count; mobile users get the same choices in a selector" },
       { type: "feat", text: "Pinned collections — owners can pin favorite collections so they stay first in Collections and Tabs" },
