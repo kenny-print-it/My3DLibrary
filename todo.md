@@ -22,4 +22,4 @@
 - [x] Add a Google Gemini online preset for text and image selection using the user’s own API key
 - [x] Add clear in-app confirmation that render images are sent to Google and free-tier availability is quota-limited
 - [x] Update the GitHub README, portable readmes, and in-app changelog to recommend Gemini online and limit Groq to legacy text-only use
-- [ ] Build, verify, and publish refreshed Windows and Mac v1.3 beta packages without removing the original Build 1 assets
+- [x] Build, verify, and publish refreshed Windows and Mac v1.3 beta packages without removing the original Build 1 assets
