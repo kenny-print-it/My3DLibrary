@@ -4,6 +4,25 @@ All notable changes to My3DLibrary are documented here.
 
 ---
 
+## [v1.3.0-beta Build 3] — 2026-09-02
+
+### New Features
+
+**Wide-screen library layout**
+The Library now makes practical use of ultra-wide monitors. The content area expands in measured steps on larger displays, allowing more model cards per row while keeping card sizes easy to browse.
+
+**Library identity beside the title**
+The My3DLibrary logo now appears beside the My 3D Library title, version, model count, and collection count. The duplicate product logo has been removed from the top navigation.
+
+**Sticky library controls**
+While browsing a library, the title area remains visible immediately below the main navigation along with sorting, search, favorites, thumbnail generation, selection, and filter controls. This makes it easier to refine a large collection without scrolling back to the top.
+
+### Compatibility
+
+The responsive layout keeps the compact two-column phone presentation, standard desktop arrangement, and an expanded ultra-wide grid. Windows and macOS portable packages use the same library interface.
+
+---
+
 ## [v1.3.0-beta] — 2026-08-31
 
 ### New Features

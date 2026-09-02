@@ -47,6 +47,7 @@ import { sortCollectionGroups } from "@/lib/categoryOrdering";
 import { pickCollectionCover } from "@/lib/categoryCover";
 import { sortCompactModels, type CompactListSortDirection, type CompactListSortField } from "@/lib/compactListSorting";
 import { CategoryCoverSurface } from "@/components/CategoryCoverSurface";
+import { getPortableLibraryColumnCount, PORTABLE_LIBRARY_TOOLBAR_CLASS } from "@/lib/libraryLayout";
 
 // Local version: images served directly from local filesystem
 function getModelImageUrl(images: any[] | null | undefined, heroImage: string | null | undefined, _size: number): string | null {
@@ -255,12 +256,7 @@ function useColumnCount() {
   const [cols, setCols] = useState(2);
   useEffect(() => {
     function update() {
-      const w = window.innerWidth;
-      if (w >= 1280) setCols(6);
-      else if (w >= 1024) setCols(5);
-      else if (w >= 768) setCols(4);
-      else if (w >= 640) setCols(3);
-      else setCols(2);
+      setCols(getPortableLibraryColumnCount(window.innerWidth));
     }
     update();
     window.addEventListener("resize", update);
@@ -565,7 +561,7 @@ function CategoryTabsBrowser({ groups, activeTab, onTabChange, onNavigate, sortF
   const visibleModels = selectedGroup?.models ?? allModels;
   const label = selectedGroup ? (selectedGroup.category.customLabel || selectedGroup.category.name) : "All Collections";
   const cover = selectedGroup ? pickCollectionCover(selectedGroup.models, (model) => getModelImageUrl(model.images, model.heroImage, 1200)) : undefined;
-  return <Tabs value={activeTab} onValueChange={onTabChange} className="gap-0"><div className="sticky top-14 z-20 -mx-4 mb-5 border-y border-border/50 bg-background/95 px-4 py-2.5 backdrop-blur-md sm:mx-0 sm:rounded-xl sm:border"><div className="overflow-x-auto"><TabsList className="h-auto w-max max-w-none gap-1 bg-secondary/70 p-1"><TabsTrigger value="all" className="h-8 gap-1.5 px-3 text-xs">All <span>{allModels.length}</span></TabsTrigger>{groups.map((group) => <TabsTrigger key={group.category.id} value={String(group.category.id)} className="h-8 gap-1.5 px-3 text-xs"><span className="max-w-32 truncate">{group.category.customLabel || group.category.name}</span>{group.category.isPinned && <Pin className="h-3 w-3 fill-amber-500 text-amber-500" />}<span>{group.models.length}</span></TabsTrigger>)}</TabsList></div></div><TabsContent value={activeTab} className="mt-0"><CategoryCoverSurface imageUrl={cover} className="mb-4"><div className="min-h-24 px-4 py-5"><h2 className="text-xl font-semibold text-foreground">{label}</h2><p className="text-sm text-muted-foreground">{visibleModels.length} models</p></div></CategoryCoverSurface><CompactModelList models={visibleModels} onNavigate={onNavigate} sortField={sortField} sortDirection={sortDirection} onSort={onSort} categoryLabels={categoryLabels} /></TabsContent></Tabs>;
+  return <Tabs value={activeTab} onValueChange={onTabChange} className="gap-0"><div className="-mx-4 mb-5 border-y border-border/50 bg-background/95 px-4 py-2.5 sm:mx-0 sm:rounded-xl sm:border"><div className="overflow-x-auto"><TabsList className="h-auto w-max max-w-none gap-1 bg-secondary/70 p-1"><TabsTrigger value="all" className="h-8 gap-1.5 px-3 text-xs">All <span>{allModels.length}</span></TabsTrigger>{groups.map((group) => <TabsTrigger key={group.category.id} value={String(group.category.id)} className="h-8 gap-1.5 px-3 text-xs"><span className="max-w-32 truncate">{group.category.customLabel || group.category.name}</span>{group.category.isPinned && <Pin className="h-3 w-3 fill-amber-500 text-amber-500" />}<span>{group.models.length}</span></TabsTrigger>)}</TabsList></div></div><TabsContent value={activeTab} className="mt-0"><CategoryCoverSurface imageUrl={cover} className="mb-4"><div className="min-h-24 px-4 py-5"><h2 className="text-xl font-semibold text-foreground">{label}</h2><p className="text-sm text-muted-foreground">{visibleModels.length} models</p></div></CategoryCoverSurface><CompactModelList models={visibleModels} onNavigate={onNavigate} sortField={sortField} sortDirection={sortDirection} onSort={onSort} categoryLabels={categoryLabels} /></TabsContent></Tabs>;
 }
 
 export default function Home() {
@@ -834,20 +830,24 @@ export default function Home() {
   return (
     <div className="container py-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight">My 3D Library</h1>
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 tracking-wide">
-              v{__APP_VERSION__}
-            </span>
+      <div className={cn(PORTABLE_LIBRARY_TOOLBAR_CLASS, "mb-6") }>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 items-center gap-3">
+            <img src="/my3dlibrary-logo.png" alt="My3DLibrary" className="h-13 w-13 shrink-0 rounded-lg object-contain" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold text-foreground tracking-tight">My 3D Library</h1>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 tracking-wide">
+                  v{__APP_VERSION__}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {models.length} model{models.length !== 1 ? "s" : ""} · {topCategories.length} collection{topCategories.length !== 1 ? "s" : ""}
+              </p>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {models.length} model{models.length !== 1 ? "s" : ""} · {topCategories.length} collection{topCategories.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex-1" />
+          <div className="flex items-center gap-2 flex-wrap">
           {/* Sort dropdown */}
           <div className="flex items-center gap-1.5">
             <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -959,6 +959,7 @@ export default function Home() {
               <span className="ml-1 w-4 h-4 rounded-full bg-primary-foreground/20 text-xs flex items-center justify-center">{activeFilterCount}</span>
             )}
           </button>
+          </div>
         </div>
       </div>
 
@@ -1308,7 +1309,7 @@ export default function Home() {
 
       {/* Loading skeletons */}
       {modelsLoading && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="library-model-grid gap-4">
           {Array.from({ length: 12 }).map((_, i) => <ModelCardSkeleton key={i} />)}
         </div>
       )}

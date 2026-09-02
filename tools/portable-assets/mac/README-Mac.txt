@@ -14,6 +14,10 @@ Choose **Collections**, **Tabs**, or **Compact List** on the Library page. Tabs 
 
 Recently Added can be hidden, and your library view, active tab, sorting, and visibility choices are remembered on that computer.
 
+BUILD 3: WIDE-SCREEN BROWSING
+-----------------------------
+The My3DLibrary logo is beside the Library title and model count. The title, search, sort, selection, and filter controls stay visible while you browse. On ultra-wide monitors, the Library uses more of the available width to show additional model cards per row. Phone layouts remain compact.
+
 FREE LOCAL AI (OPTIONAL)
 ------------------------
 My3DLibrary works without AI. For free text tags and image analysis, install Ollama and run the models locally on your Mac:

@@ -26,6 +26,10 @@ Choose the layout that works best for your collection:
 
 The app remembers your chosen layout, selected tab, Compact List sorting, and Recently Added visibility on that computer. Owners can also pin favorite collections so they stay first. Category sections and selected Tabs use a model’s existing hero image as a cover banner when one is available.
 
+### Build 3: Wide-Screen Browsing
+
+The My3DLibrary logo is shown beside the **My 3D Library** title and model count. The title, sort control, search field, favorites, thumbnail-generation, selection, and Filters controls stay available just below the app navigation as you browse. On ultra-wide monitors, the Library expands in sensible steps to show more model cards per row. Phone layouts remain compact and easy to use.
+
 ---
 
 ## Folder Structure

@@ -22,6 +22,7 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 - **AI Setup Guide** — interactive wizard with one-click auto-fill for all AI provider settings
 - **Search** by name, tag, or collection
 - **Browse your way** — use Collections, category Tabs, or Compact List; pin favorite collections and use existing hero images as collection covers
+- **Wide-display ready** — the Library expands in measured steps on ultra-wide screens, with more model cards per row and the browse controls kept within reach
 - **Manage** multiple library locations across different drives
 - **Recycle bin** — soft-delete models with restore and purge options
 - **Bulk tag** — apply or remove tags across multiple models at once
@@ -35,8 +36,8 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 
 | Platform | Current build | Download |
 |---|---:|---|
-| Windows | **v1.3 Beta — Build 2** | [Download Windows Build 2](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Windows-v1.3-Beta-build2.zip) |
-| macOS | **v1.3 Beta — Build 2** | [Download Mac Build 2](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Mac-v1.3-Beta-build2.zip) |
+| Windows | **v1.3 Beta — Build 3** | [Download Windows Build 3](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Windows-v1.3-Beta-build3.zip) |
+| macOS | **v1.3 Beta — Build 3** | [Download Mac Build 3](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Mac-v1.3-Beta-build3.zip) |
 
 Previous builds remain available on the [full releases page](https://github.com/kenny-print-it/My3DLibrary/releases).
 
@@ -52,13 +53,17 @@ Extract the ZIP first. On Windows, double-click `My3DLibrary.exe`. On macOS, mov
 
 ## Quick Start
 
-1. Download and unzip `My3DLibrary-Windows-v1.3-Beta-build1.zip`
+1. Download and unzip `My3DLibrary-Windows-v1.3-Beta-build3.zip`
 2. Double-click `My3DLibrary.exe`
 3. Your browser opens automatically at `http://localhost:3000`
 4. Go to **Settings → Library**, click **Add Folder**, and point it at your models folder
 5. Click **Start Scan** — your library populates automatically
 
 See `README-PORTABLE.md` inside the ZIP for full documentation including AI setup, scan depth options, and troubleshooting.
+
+### Build 3: Wide-Screen Browsing
+
+Build 3 places the My3DLibrary logo beside the Library title and keeps the title, model count, sort, search, selection, and filter controls visible while you browse. On larger monitors, the Library uses the extra width for additional model cards per row; on phones, the compact two-column layout is unchanged.
 
 ---
 

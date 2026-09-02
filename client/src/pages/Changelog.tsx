@@ -14,9 +14,19 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
-    version: "v1.3 Beta",
-    date: "August 2026",
+    version: "v1.3 Beta — Build 3",
+    date: "September 2026",
     label: "Current",
+    entries: [
+      { type: "improve", text: "Ultra-wide Library layout — the content area expands in measured steps on large and ultra-wide displays, showing more model cards per row without making them awkwardly large" },
+      { type: "feat", text: "My3DLibrary branding beside the Library title — the product logo now sits beside the My 3D Library heading, version, model count, and collection count" },
+      { type: "feat", text: "Sticky Library controls — the title, sort menu, search field, favorites, thumbnail-generation, selection, and Filters controls remain available below the app navigation while browsing" },
+      { type: "improve", text: "Simplified top navigation — the duplicate My3DLibrary product mark was removed from the top bar now that the full logo identifies the Library page" },
+    ],
+  },
+  {
+    version: "v1.3 Beta — Build 2",
+    date: "August 2026",
     entries: [
       { type: "improve", text: "Google Gemini online AI — the recommended online setup supports both text tags and render-image selection using your own Gemini API key and free-tier quota. The Setup Guide asks for clear privacy confirmation before render thumbnails are sent to Google." },
       { type: "feat", text: "Collections, Tabs, and Compact List layouts — browse by expandable collection sections, jump between horizontal category tabs, or use dense model rows" },

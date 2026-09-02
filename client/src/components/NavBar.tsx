@@ -64,16 +64,8 @@ export default function NavBar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur-md">
       <div className="container flex h-14 items-center gap-6">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <img src="/m3dl-icon.png" alt="My3DLibrary" className="h-8 w-8 object-contain" />
-          <span className="font-semibold text-sm tracking-wide text-foreground">
-            My3DLibrary
-          </span>
-        </Link>
-
         {/* Nav links */}
-        <nav className="flex items-center gap-1 ml-2">
+        <nav className="flex items-center gap-1">
           <Link
             href="/"
             className={cn(
