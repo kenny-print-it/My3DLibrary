@@ -1,6 +1,6 @@
 /**
  * package-mac.mjs
- * Builds My3DLibrary-Mac-v1.3-Beta-build3.zip using:
+ * Builds My3DLibrary-Mac-v1.3-Beta-build4.zip using:
  * - New dist/ (freshly built frontend + server bundle)
  * - Existing MacOS launcher, AppIcon, runtime (node-x64 + node-arm64), node_modules_arm64
  */
@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, rmSync, cpSync } from "fs";
 const PORTABLE = "/home/ubuntu/My3DLibrary-src";
 const MAC_EXTRAS = "/tmp/mac-extras";
 const STAGING = "/tmp/mac-staging";
-const OUT = "/home/ubuntu/My3DLibrary-Mac-v1.3-Beta-build3.zip";
+const OUT = "/home/ubuntu/My3DLibrary-Mac-v1.3-Beta-build4.zip";
 
 console.log("📦 Packaging Mac ZIP...");
 

@@ -47,7 +47,8 @@ import { sortCollectionGroups } from "@/lib/categoryOrdering";
 import { pickCollectionCover } from "@/lib/categoryCover";
 import { sortCompactModels, type CompactListSortDirection, type CompactListSortField } from "@/lib/compactListSorting";
 import { CategoryCoverSurface } from "@/components/CategoryCoverSurface";
-import { getPortableLibraryColumnCount, PORTABLE_LIBRARY_TOOLBAR_CLASS } from "@/lib/libraryLayout";
+import { PORTABLE_LIBRARY_TOOLBAR_CLASS } from "@/lib/libraryLayout";
+import { getPortableDensityCardHeight, getPortableDensityColumnCount, LIBRARY_CARD_DENSITY_OPTIONS, LIBRARY_DENSITY_KEY, normalizeLibraryCardDensity, type LibraryCardDensity } from "@/lib/libraryDensity";
 
 // Local version: images served directly from local filesystem
 function getModelImageUrl(images: any[] | null | undefined, heroImage: string | null | undefined, _size: number): string | null {
@@ -252,16 +253,16 @@ function useCategoryCollapse() {
 }
 
 // Responsive column count hook
-function useColumnCount() {
+function useColumnCount(density: LibraryCardDensity) {
   const [cols, setCols] = useState(2);
   useEffect(() => {
     function update() {
-      setCols(getPortableLibraryColumnCount(window.innerWidth));
+      setCols(getPortableDensityColumnCount(window.innerWidth, density));
     }
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, []);
+  }, [density]);
   return cols;
 }
 
@@ -273,6 +274,7 @@ function VirtualModelGrid({
   selectMode = false,
   selectedModels,
   onToggleSelect,
+  density,
 }: {
   models: any[];
   isReordering: boolean;
@@ -280,9 +282,10 @@ function VirtualModelGrid({
   selectMode?: boolean;
   selectedModels?: Set<number>;
   onToggleSelect?: (id: number) => void;
+  density: LibraryCardDensity;
 }) {
-  const cols = useColumnCount();
-  const CARD_HEIGHT = 220; // approximate card height in px
+  const cols = useColumnCount(density);
+  const CARD_HEIGHT = getPortableDensityCardHeight(density);
   const GAP = 16;
   const rows = Math.ceil(models.length / cols);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -343,6 +346,7 @@ function SortableCategoryRow({
   selectMode = false,
   selectedModels,
   onToggleSelect,
+  density,
 }: {
   group: { category: any; models: any[] };
   isReordering: boolean;
@@ -356,6 +360,7 @@ function SortableCategoryRow({
   selectMode?: boolean;
   selectedModels?: Set<number>;
   onToggleSelect?: (id: number) => void;
+  density: LibraryCardDensity;
 }) {
   const catKey = String(group.category.id);
   const isCollapsed = collapsed.has(catKey);
@@ -407,7 +412,7 @@ function SortableCategoryRow({
         </div>
         </CategoryCoverSurface>
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-none">
-          <VirtualModelGrid models={group.models} isReordering={isReordering} onNavigate={onNavigate} selectMode={selectMode} selectedModels={selectedModels} onToggleSelect={onToggleSelect} />
+          <VirtualModelGrid models={group.models} isReordering={isReordering} onNavigate={onNavigate} selectMode={selectMode} selectedModels={selectedModels} onToggleSelect={onToggleSelect} density={density} />
         </CollapsibleContent>
       </Collapsible>
     </div>
@@ -422,6 +427,7 @@ function CategoryGallery({
   selectMode = false,
   selectedModels,
   onToggleSelect,
+  density,
 }: {
   groups: { category: any; models: any[] }[];
   onNavigate: (path: string) => void;
@@ -430,6 +436,7 @@ function CategoryGallery({
   selectMode?: boolean;
   selectedModels?: Set<number>;
   onToggleSelect?: (id: number) => void;
+  density: LibraryCardDensity;
 }) {
   const utils = trpc.useUtils();
   const allCategoryIds = useMemo(() => groups.map((g) => String(g.category.id)), [groups]);
@@ -535,6 +542,7 @@ function CategoryGallery({
               selectMode={selectMode}
               selectedModels={selectedModels}
               onToggleSelect={onToggleSelect}
+              density={density}
             />
           ))}
         </SortableContext>
@@ -592,6 +600,7 @@ export default function Home() {
   const [recentlyAddedCollapsed, setRecentlyAddedCollapsed] = useState(() => { try { return localStorage.getItem(RECENTLY_ADDED_COLLAPSED_KEY) === "true"; } catch { return false; } });
   const [compactSortField, setCompactSortField] = useState<CompactListSortField>(() => { try { const value = localStorage.getItem("printlib_compact_sort_field"); return value === "collection" || value === "tags" || value === "files" ? value : "name"; } catch { return "name"; } });
   const [compactSortDirection, setCompactSortDirection] = useState<CompactListSortDirection>(() => { try { return localStorage.getItem("printlib_compact_sort_direction") === "desc" ? "desc" : "asc"; } catch { return "asc"; } });
+  const [cardDensity, setCardDensity] = useState<LibraryCardDensity>(() => { try { return normalizeLibraryCardDensity(localStorage.getItem(LIBRARY_DENSITY_KEY)); } catch { return "comfortable"; } });
   const handleSortChange = (v: string) => {
     const sort = v as SortOption;
     setSortBy(sort);
@@ -650,6 +659,8 @@ export default function Home() {
   const saveActiveTab = (value: string) => { setActiveCategoryTab(value); try { localStorage.setItem(CATEGORY_TAB_KEY, value); } catch {} };
   const saveCompactSort = (field: CompactListSortField) => { const direction = field === compactSortField ? (compactSortDirection === "asc" ? "desc" : "asc") : "asc"; setCompactSortField(field); setCompactSortDirection(direction); try { localStorage.setItem("printlib_compact_sort_field", field); localStorage.setItem("printlib_compact_sort_direction", direction); } catch {} };
   const toggleRecentlyAdded = () => setRecentlyAddedCollapsed((current) => { const next = !current; try { localStorage.setItem(RECENTLY_ADDED_COLLAPSED_KEY, String(next)); } catch {} return next; });
+  const saveCardDensity = (value: string) => { const next = normalizeLibraryCardDensity(value); setCardDensity(next); try { localStorage.setItem(LIBRARY_DENSITY_KEY, next); } catch {} };
+  const densityColumns = useColumnCount(cardDensity);
 
   // isConfigured: false means no library paths set up yet (first-run state)
   const isConfigured = scanStatus?.isConfigured !== false; // default true until data loads
@@ -848,6 +859,16 @@ export default function Home() {
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-2 flex-wrap">
+          <Select value={cardDensity} onValueChange={saveCardDensity}>
+            <SelectTrigger className="h-9 w-36 bg-secondary border-border/50 text-sm text-foreground focus:ring-ring" aria-label="Card density">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LIBRARY_CARD_DENSITY_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>{option.label} · {option.description}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {/* Sort dropdown */}
           <div className="flex items-center gap-1.5">
             <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -1309,7 +1330,7 @@ export default function Home() {
 
       {/* Loading skeletons */}
       {modelsLoading && (
-        <div className="library-model-grid gap-4">
+        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${densityColumns}, minmax(0, 1fr))` }}>
           {Array.from({ length: 12 }).map((_, i) => <ModelCardSkeleton key={i} />)}
         </div>
       )}
@@ -1339,7 +1360,7 @@ export default function Home() {
               )}
             </div>
           ) : (
-            <VirtualModelGrid models={models} isReordering={false} onNavigate={navigate} selectMode={bulkMode} selectedModels={selectedModels} onToggleSelect={toggleModelSelection} />
+            <VirtualModelGrid models={models} isReordering={false} onNavigate={navigate} selectMode={bulkMode} selectedModels={selectedModels} onToggleSelect={toggleModelSelection} density={cardDensity} />
           )}
         </div>
       )}
@@ -1347,7 +1368,7 @@ export default function Home() {
       {/* Grouped by category */}
       {!modelsLoading && grouped && <>
         <div className="mb-5 flex items-center justify-between rounded-xl border border-border/50 bg-card/50 px-3 py-2.5"><span className="text-xs font-medium text-foreground">Browse layout</span><div className="inline-flex rounded-lg border border-border/60 bg-secondary/70 p-1"><button onClick={() => saveLibraryView("collections")} className={cn("rounded-md px-3 py-1.5 text-xs", libraryView === "collections" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>Collections</button><button onClick={() => saveLibraryView("tabs")} className={cn("rounded-md px-3 py-1.5 text-xs", libraryView === "tabs" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground")}>Tabs</button><button onClick={() => saveLibraryView("list")} className={cn("rounded-md px-3 py-1.5 text-xs", libraryView === "list" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground")}>Compact List</button></div></div>
-        {libraryView === "collections" && <CategoryGallery groups={grouped} onNavigate={navigate} onViewAll={setSelectedCategory} isAdmin={isAdmin} selectMode={bulkMode} selectedModels={selectedModels} onToggleSelect={toggleModelSelection} />}
+        {libraryView === "collections" && <CategoryGallery groups={grouped} onNavigate={navigate} onViewAll={setSelectedCategory} isAdmin={isAdmin} selectMode={bulkMode} selectedModels={selectedModels} onToggleSelect={toggleModelSelection} density={cardDensity} />}
         {libraryView === "tabs" && <CategoryTabsBrowser groups={grouped} activeTab={normalizeCategoryTab(activeCategoryTab, categoryTabIds)} onTabChange={saveActiveTab} onNavigate={navigate} sortField={compactSortField} sortDirection={compactSortDirection} onSort={saveCompactSort} categoryLabels={categoryLabels} />}
         {libraryView === "list" && <CompactModelList models={models} onNavigate={navigate} sortField={compactSortField} sortDirection={compactSortDirection} onSort={saveCompactSort} categoryLabels={categoryLabels} />}
       </>}

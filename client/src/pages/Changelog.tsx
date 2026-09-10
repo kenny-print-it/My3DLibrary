@@ -14,9 +14,20 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
-    version: "v1.3 Beta — Build 3",
+    version: "v1.3 Beta — Build 4",
     date: "September 2026",
     label: "Current",
+    entries: [
+      { type: "feat", text: "My3DLibrary Light, Dark, and High Contrast themes — choose your preferred look in Settings → Appearance; the app remembers the choice" },
+      { type: "feat", text: "Startup preferences — select Quick, Standard, or Leisurely opening timing, with an optional startup sound that remains off by default" },
+      { type: "feat", text: "Card density — choose Compact, Comfortable, or Roomy model cards from the Library toolbar" },
+      { type: "feat", text: "Prefer This Hero — lock the active model image as your manual choice so later AI re-picks do not replace it" },
+      { type: "improve", text: "Cleaner AI hero selections — AI now favors clean, assembled single-model renders and avoids exploded views, contact sheets, collages, and multi-angle image layouts" },
+    ],
+  },
+  {
+    version: "v1.3 Beta — Build 3",
+    date: "September 2026",
     entries: [
       { type: "improve", text: "Ultra-wide Library layout — the content area expands in measured steps on large and ultra-wide displays, showing more model cards per row without making them awkwardly large" },
       { type: "feat", text: "My3DLibrary branding beside the Library title — the product logo now sits beside the My 3D Library heading, version, model count, and collection count" },

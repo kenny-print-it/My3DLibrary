@@ -39,7 +39,37 @@
 
 :root {
   --radius: 0.5rem;
-  /* Dark Plex-inspired theme — always dark */
+  /* My3DLibrary logo palette: crisp blue surfaces, teal support tones, warm orange actions. */
+  --background: oklch(0.975 0.012 235);
+  --foreground: oklch(0.24 0.045 245);
+  --card: oklch(0.995 0.004 240);
+  --card-foreground: oklch(0.24 0.045 245);
+  --popover: oklch(0.995 0.004 240);
+  --popover-foreground: oklch(0.24 0.045 245);
+  --primary: oklch(0.62 0.175 245);
+  --primary-foreground: oklch(0.99 0.004 240);
+  --secondary: oklch(0.93 0.026 235);
+  --secondary-foreground: oklch(0.29 0.055 245);
+  --muted: oklch(0.95 0.017 235);
+  --muted-foreground: oklch(0.48 0.035 245);
+  --accent: oklch(0.90 0.045 200);
+  --accent-foreground: oklch(0.25 0.075 230);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.84 0.032 235);
+  --input: oklch(0.97 0.01 235);
+  --ring: oklch(0.64 0.17 245);
+  --sidebar: oklch(0.95 0.022 235);
+  --sidebar-foreground: oklch(0.29 0.055 245);
+  --sidebar-primary: oklch(0.62 0.175 245);
+  --sidebar-primary-foreground: oklch(0.99 0.004 240);
+  --sidebar-accent: oklch(0.90 0.045 200);
+  --sidebar-accent-foreground: oklch(0.25 0.075 230);
+  --sidebar-border: oklch(0.84 0.032 235);
+  --sidebar-ring: oklch(0.64 0.17 245);
+}
+
+.dark {
   --background: oklch(0.12 0.005 240);
   --foreground: oklch(0.93 0.01 240);
   --card: oklch(0.16 0.006 240);
@@ -54,8 +84,6 @@
   --muted-foreground: oklch(0.55 0.01 240);
   --accent: oklch(0.22 0.008 240);
   --accent-foreground: oklch(0.93 0.01 240);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
   --border: oklch(0.25 0.008 240);
   --input: oklch(0.22 0.008 240);
   --ring: oklch(0.75 0.18 65);
@@ -67,6 +95,34 @@
   --sidebar-accent-foreground: oklch(0.85 0.01 240);
   --sidebar-border: oklch(0.20 0.007 240);
   --sidebar-ring: oklch(0.75 0.18 65);
+}
+
+.high-contrast {
+  --background: oklch(0.08 0 0);
+  --foreground: oklch(0.99 0 0);
+  --card: oklch(0.13 0 0);
+  --card-foreground: oklch(0.99 0 0);
+  --popover: oklch(0.11 0 0);
+  --popover-foreground: oklch(0.99 0 0);
+  --primary: oklch(0.88 0.17 95);
+  --primary-foreground: oklch(0.12 0 0);
+  --secondary: oklch(0.20 0 0);
+  --secondary-foreground: oklch(0.99 0 0);
+  --muted: oklch(0.19 0 0);
+  --muted-foreground: oklch(0.84 0 0);
+  --accent: oklch(0.24 0.045 245);
+  --accent-foreground: oklch(0.99 0 0);
+  --border: oklch(0.82 0 0);
+  --input: oklch(0.16 0 0);
+  --ring: oklch(0.9 0.16 95);
+  --sidebar: oklch(0.08 0 0);
+  --sidebar-foreground: oklch(0.99 0 0);
+  --sidebar-primary: oklch(0.88 0.17 95);
+  --sidebar-primary-foreground: oklch(0.12 0 0);
+  --sidebar-accent: oklch(0.24 0.045 245);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-border: oklch(0.82 0 0);
+  --sidebar-ring: oklch(0.9 0.16 95);
 }
 
 @layer base {

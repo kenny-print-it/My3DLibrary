@@ -19,6 +19,7 @@ import type { DriveImage } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import fs from "fs";
 import path from "path";
+import { rankPortableThumbnailCandidates } from "./thumbnailCandidates";
 
 /**
  * Check that the configured model is actually available in Ollama.
@@ -140,26 +141,26 @@ export async function pickBestThumbnail(
     return heroUrl;
   }
 
-  // Build vision message: send up to 3 thumbnails to stay within Ollama's context limit.
-  // LLaVA has a small context window; sending more than 3 images risks 413 errors.
-  const candidates = images.slice(0, 3);
+  // Filename scoring puts likely final renders first, then the vision model makes
+  // the grounded choice. Limit remains conservative for local provider context windows.
+  const candidates = rankPortableThumbnailCandidates(images, 4);
 
   // Convert images to base64 data URIs for local files (Ollama can't fetch
   // relative server URLs like /local-files/...). Remote URLs pass through.
   const imageUrls = await Promise.all(
-    candidates.map((img) => toBase64DataUri(img as any))
+    candidates.map((candidate) => toBase64DataUri(candidate.image as any))
   );
   // Filter out any images that failed to load
   const validPairs = candidates
-    .map((img, i) => ({ img, url: imageUrls[i] }))
+    .map((candidate, i) => ({ candidate, url: imageUrls[i] }))
     .filter((p) => p.url !== null);
 
   if (validPairs.length === 0) return null;
 
-  const imageContents = validPairs.map(({ url }) => ({
-    type: "image_url" as const,
-    image_url: { url: url!, detail: "low" as const },
-  }));
+  const imageContents = validPairs.flatMap(({ candidate, url }) => [
+    { type: "text" as const, text: candidate.label },
+    { type: "image_url" as const, image_url: { url: url!, detail: "high" as const } },
+  ]);
 
   const textContent = {
     type: "text" as const,
@@ -168,16 +169,14 @@ export async function pickBestThumbnail(
 
 Model name: "${modelName}"
 
-You are shown ${validPairs.length} images (numbered 1 to ${validPairs.length}) from this model's folder.
+You are shown ${validPairs.length} labeled candidate images. The label immediately before each image gives its candidate number.
 
-Pick the SINGLE best image that:
-- Shows the COMPLETE, fully assembled model
-- Has a clear, unobstructed view of the whole object
-- Is NOT a partial part, work-in-progress, assembly step, or multi-pose sheet
-- Ideally has a clean/neutral background
+Pick the SINGLE best hero image only when it clearly shows one COMPLETE, fully assembled model as the dominant subject.
 
-Respond with ONLY a JSON object like: {"index": 2}
-where the number is the 1-based position of the best image.`,
+Strongly reject exploded views, parts layouts, multi-angle sheets, contact sheets, collages, assembly instructions, work-in-progress pictures, and images with several copies or poses of the model. Never select those when a clean single-model render is available. Prefer a front or three-quarter render with the entire model visible and a simple background.
+
+Respond with ONLY JSON in this exact form: {"index": 2, "confidence": 88}
+where index is the 1-based candidate number and confidence is an integer from 0 to 100. Use confidence below 55 if none of the images is a safe clean hero choice.`,
   };
 
   try {
@@ -197,7 +196,7 @@ where the number is the 1-based position of the best image.`,
     if (!raw) return null;
 
     // Extract JSON from the response — the model may wrap it in markdown code fences
-    let parsed: { index: number };
+    let parsed: { index: number; confidence?: number };
     try {
       // Try direct parse first
       parsed = JSON.parse(raw.trim());
@@ -213,17 +212,10 @@ where the number is the 1-based position of the best image.`,
     }
 
     const idx = parsed.index - 1; // convert to 0-based
-    if (idx < 0 || idx >= validPairs.length) {
-      // LLM returned out-of-range index — fall back to first valid image
-      const fallback = validPairs[0]?.img;
-      if (!fallback) return null;
-      const heroUrl = heroUrlForImage(fallback as any);
-      await db.updateModelHeroImage(modelId, heroUrl, "ai");
-      return heroUrl;
-    }
+    if (idx < 0 || idx >= validPairs.length || !Number.isFinite(parsed.confidence) || Number(parsed.confidence) < 55) return null;
 
     // Store the hero URL — use thumbnailLink for local files, proxy for Drive
-    const chosenImg = validPairs[idx]?.img;
+    const chosenImg = validPairs[idx]?.candidate.image;
     if (!chosenImg) return null;
     const heroUrl = heroUrlForImage(chosenImg as any);
     await db.updateModelHeroImage(modelId, heroUrl, "ai");

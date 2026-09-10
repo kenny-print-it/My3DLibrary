@@ -4,6 +4,29 @@ All notable changes to My3DLibrary are documented here.
 
 ---
 
+## [v1.3.0-beta Build 4] — 2026-09-10
+
+### New Features
+
+**My3DLibrary appearance choices**
+Choose the My3DLibrary Light theme, the original Dark theme, or a High Contrast theme from Settings → Appearance. The selected look is remembered on the device.
+
+**Startup preferences**
+Choose a Quick, Standard, or Leisurely My3DLibrary opening screen. A small startup chime is available as an optional setting and remains off by default.
+
+**Card-density choices**
+Choose Compact, Comfortable, or Roomy model cards from the Library toolbar. The Library remembers the choice and applies it across Collections and Tabs.
+
+**Prefer This Hero**
+Model detail pages now show a clear Prefer This Hero action under the active image. It protects the selected image from later AI hero-image updates.
+
+### Improved
+
+**Cleaner AI hero-image selection**
+AI hero-image selection now favors a clean, assembled single-model render. It avoids exploded layouts, multi-angle sheets, collages, assembly diagrams, and contact sheets when a better hero render is available.
+
+---
+
 ## [v1.3.0-beta Build 3] — 2026-09-02
 
 ### New Features

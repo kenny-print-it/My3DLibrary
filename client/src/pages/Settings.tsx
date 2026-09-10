@@ -6,17 +6,20 @@ import {
   Lock, Pencil, Save, Key, Eye, EyeOff, ChevronRight,
   HelpCircle, X, ArrowLeft, Folder, ToggleLeft, ToggleRight,
   CheckCircle2, AlertCircle, Loader2, Square,
+  Palette, Contrast, Moon, Sun, Volume2, Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { AI_SETUP_PRESETS, requiresImageUploadConsent, type AIPreset, type AISetupOption } from "@/lib/aiProviderPresets";
+import { useTheme, type Theme } from "@/contexts/ThemeContext";
+import { loadStartupPreferences, saveStartupPreferences, STARTUP_DURATION_OPTIONS, type StartupPreferences } from "@/lib/startupPreferences";
 
 const TAG_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316",
   "#eab308", "#22c55e", "#14b8a6", "#06b6d4", "#3b82f6",
 ];
 
-type SettingsTab = "library" | "tags" | "trash";
+type SettingsTab = "library" | "appearance" | "tags" | "trash";
 
 // ── Folder Browser Dialog ──────────────────────────────────────────────────
 function FolderBrowserDialog({
@@ -409,6 +412,12 @@ function AISetupGuideDialog({
 export default function Settings() {
   const utils = trpc.useUtils();
   const [activeTab, setActiveTab] = useState<SettingsTab>("library");
+  const { theme, setTheme } = useTheme();
+  const [startupPreferences, setStartupPreferences] = useState<StartupPreferences>(() => loadStartupPreferences());
+  const updateStartupPreferences = (next: StartupPreferences) => {
+    setStartupPreferences(next);
+    saveStartupPreferences(next);
+  };
 
   // Library path settings
   const { data: settings } = trpc.settings.get.useQuery();
@@ -590,6 +599,7 @@ export default function Settings() {
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: "library", label: "Library", icon: <FolderOpen className="w-4 h-4" /> },
+    { id: "appearance", label: "Appearance", icon: <Palette className="w-4 h-4" /> },
     { id: "tags", label: "Tags", icon: <Tag className="w-4 h-4" /> },
     { id: "trash", label: "Trash", icon: <Trash2 className="w-4 h-4" /> },
   ];
@@ -1378,6 +1388,54 @@ export default function Settings() {
               </div>
             </section>
 
+          </div>
+        )}
+
+        {/* ── Appearance Tab ── */}
+        {activeTab === "appearance" && (
+          <div className="space-y-6">
+            <section className="rounded-xl border border-border/50 bg-card overflow-hidden">
+              <div className="border-b border-border/50 px-5 py-4">
+                <h2 className="text-sm font-semibold text-foreground">Appearance</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">Choose a saved color mode for this copy of My3DLibrary.</p>
+              </div>
+              <div className="grid gap-3 p-5 sm:grid-cols-3">
+                {([
+                  { value: "light" as Theme, label: "My3DLibrary Light", description: "Logo blue, teal, and orange", icon: <Sun className="h-4 w-4" />, swatches: ["#e7f4fb", "#2f9bd6", "#f59a28"] },
+                  { value: "dark" as Theme, label: "Dark", description: "The original dark library", icon: <Moon className="h-4 w-4" />, swatches: ["#101216", "#343945", "#f59a28"] },
+                  { value: "high-contrast" as Theme, label: "High Contrast", description: "Stronger text and focus visibility", icon: <Contrast className="h-4 w-4" />, swatches: ["#111111", "#ffffff", "#f5df22"] },
+                ]).map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setTheme(option.value)}
+                    className={cn("rounded-xl border p-4 text-left transition-all", theme === option.value ? "border-primary bg-primary/10 ring-1 ring-primary/30" : "border-border/60 hover:border-primary/50 hover:bg-secondary/50")}
+                  >
+                    <div className="mb-3 flex items-center justify-between"><span className="text-primary">{option.icon}</span><span className="flex gap-1">{option.swatches.map((color) => <span key={color} className="h-3 w-3 rounded-full border border-black/10" style={{ backgroundColor: color }} />)}</span></div>
+                    <p className="text-sm font-semibold text-foreground">{option.label}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-border/50 bg-card overflow-hidden">
+              <div className="border-b border-border/50 px-5 py-4">
+                <h2 className="text-sm font-semibold text-foreground">Startup splash</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">Show the My3DLibrary logo briefly whenever the app opens.</p>
+              </div>
+              <div className="space-y-4 p-5">
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground"><Timer className="h-4 w-4 text-primary" /> Splash duration</div>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {STARTUP_DURATION_OPTIONS.map((option) => <button key={option.value} onClick={() => updateStartupPreferences({ ...startupPreferences, duration: option.value })} className={cn("rounded-lg border px-3 py-2.5 text-left", startupPreferences.duration === option.value ? "border-primary bg-primary/10" : "border-border/60 hover:bg-secondary/50")}><p className="text-sm font-medium text-foreground">{option.label}</p><p className="text-xs text-muted-foreground">{option.description}</p></button>)}
+                  </div>
+                </div>
+                <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border/60 bg-secondary/35 px-3 py-3">
+                  <span><span className="flex items-center gap-2 text-sm font-medium text-foreground"><Volume2 className="h-4 w-4 text-primary" /> Optional startup sound</span><span className="mt-0.5 block text-xs text-muted-foreground">A quiet two-note chime. It stays off by default.</span></span>
+                  <input type="checkbox" checked={startupPreferences.soundEnabled} onChange={(event) => updateStartupPreferences({ ...startupPreferences, soundEnabled: event.target.checked })} className="h-4 w-4 accent-primary" />
+                </label>
+              </div>
+            </section>
           </div>
         )}
 

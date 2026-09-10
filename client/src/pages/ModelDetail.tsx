@@ -336,6 +336,7 @@ export default function ModelDetail() {
   const images: any[] = heroIdx > 0
     ? [rawImages[heroIdx], ...rawImages.filter((_, i) => i !== heroIdx)]
     : rawImages;
+  const activeImageIsHero = !!heroImageUrl && activeImg === 0;
   // All viewable 3D files (STL + 3MF) — always computed, used for viewer fallback and retake thumbnail
   // 3MF files are prioritized over STL files
   const viewableFiles: any[] = ((model.modelFiles as any[] | null) || [])
@@ -594,6 +595,32 @@ export default function ModelDetail() {
               </div>
             )}
           </div>
+
+          {!retakeThumbnail && isOwner && images.length > 0 && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{activeImageIsHero ? "Preferred hero image" : "Choose this image as the hero"}</p>
+                <p className="text-xs text-muted-foreground">{activeImageIsHero ? "This selection is protected from future AI re-picks." : "Locks this render as your manual hero choice."}</p>
+              </div>
+              {activeImageIsHero ? (
+                <button
+                  onClick={() => clearHeroImage.mutate({ id: modelId })}
+                  disabled={clearHeroImage.isPending}
+                  className="shrink-0 rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                >
+                  Let AI choose
+                </button>
+              ) : (
+                <button
+                  onClick={() => setHeroImage.mutate({ id: modelId, heroImage: images[activeImg]?.thumbnailLink })}
+                  disabled={setHeroImage.isPending}
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  <Star className="h-3.5 w-3.5" /> Prefer This Hero
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Generate Thumbnail / Retake Thumbnail action bar */}
           {viewableFiles.length > 0 && isOwner && (images.length === 0 || retakeThumbnail) && (

@@ -30,6 +30,12 @@ The app remembers your chosen layout, selected tab, Compact List sorting, and Re
 
 The My3DLibrary logo is shown beside the **My 3D Library** title and model count. The title, sort control, search field, favorites, thumbnail-generation, selection, and Filters controls stay available just below the app navigation as you browse. On ultra-wide monitors, the Library expands in sensible steps to show more model cards per row. Phone layouts remain compact and easy to use.
 
+### Build 4: Personalize Your Library
+
+Under **Settings → Appearance**, choose the My3DLibrary Light theme, Dark theme, or High Contrast theme. The app remembers your choice on that computer. You can also choose a Quick, Standard, or Leisurely opening screen; its optional sound is off by default.
+
+The Library toolbar offers **Compact**, **Comfortable**, and **Roomy** card density choices. On a model page, select **Prefer This Hero** under the image you want to keep; later AI re-picks will leave that manual choice alone. AI hero selection also now favors a clean, assembled single-model render rather than exploded diagrams or multi-view image sheets.
+
 ---
 
 ## Folder Structure

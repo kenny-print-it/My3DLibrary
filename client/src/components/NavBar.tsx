@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { Settings, RefreshCw, Clock } from "lucide-react";
+import { Settings, RefreshCw, Clock, Sun, Moon, Contrast } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/contexts/ThemeContext";
 
 function timeAgo(date: Date | string | null | undefined): string {
   if (!date) return "";
@@ -20,6 +21,7 @@ function timeAgo(date: Date | string | null | undefined): string {
 export default function NavBar() {
   const [location] = useLocation();
   const [scanning, setScanning] = useState(false);
+  const { theme, setTheme } = useTheme();
   const utils = trpc.useUtils();
 
   const { data: scanStatus } = trpc.scan.status.useQuery(undefined, {
@@ -127,6 +129,14 @@ export default function NavBar() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "high-contrast" : "dark")}
+            className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+            title={theme === "dark" ? "Switch to My3DLibrary Light" : theme === "light" ? "Switch to High Contrast" : "Switch to Dark"}
+            aria-label="Change color theme"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : theme === "light" ? <Contrast className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           {/* Scan button */}
           <button
             onClick={() => startScan.mutate()}

@@ -16,6 +16,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import { Loader2, BrainCircuit, X, FolderOpen, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { trpc } from "./lib/trpc";
+import { PortableStartupSplash } from "./components/PortableStartupSplash";
 
 function LoadingScreen() {
   return (
@@ -204,9 +205,10 @@ function AIStartupCheck() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark">
+      <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
+          <PortableStartupSplash />
           <Router />
           <AIStartupCheck />
         </TooltipProvider>

@@ -36,8 +36,8 @@ My3DLibrary is a portable Windows app that turns your folders of STL and 3MF fil
 
 | Platform | Current build | Download |
 |---|---:|---|
-| Windows | **v1.3 Beta — Build 3** | [Download Windows Build 3](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Windows-v1.3-Beta-build3.zip) |
-| macOS | **v1.3 Beta — Build 3** | [Download Mac Build 3](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Mac-v1.3-Beta-build3.zip) |
+| Windows | **v1.3 Beta — Build 4** | [Download Windows Build 4](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Windows-v1.3-Beta-build4.zip) |
+| macOS | **v1.3 Beta — Build 4** | [Download Mac Build 4](https://github.com/kenny-print-it/My3DLibrary/releases/download/v1.3-beta/My3DLibrary-Mac-v1.3-Beta-build4.zip) |
 
 Previous builds remain available on the [full releases page](https://github.com/kenny-print-it/My3DLibrary/releases).
 
@@ -53,7 +53,7 @@ Extract the ZIP first. On Windows, double-click `My3DLibrary.exe`. On macOS, mov
 
 ## Quick Start
 
-1. Download and unzip `My3DLibrary-Windows-v1.3-Beta-build3.zip`
+1. Download and unzip `My3DLibrary-Windows-v1.3-Beta-build4.zip`
 2. Double-click `My3DLibrary.exe`
 3. Your browser opens automatically at `http://localhost:3000`
 4. Go to **Settings → Library**, click **Add Folder**, and point it at your models folder
@@ -64,6 +64,10 @@ See `README-PORTABLE.md` inside the ZIP for full documentation including AI setu
 ### Build 3: Wide-Screen Browsing
 
 Build 3 places the My3DLibrary logo beside the Library title and keeps the title, model count, sort, search, selection, and filter controls visible while you browse. On larger monitors, the Library uses the extra width for additional model cards per row; on phones, the compact two-column layout is unchanged.
+
+### Build 4: Personalize Your Library
+
+Build 4 adds the My3DLibrary Light theme, Dark theme, and a High Contrast option. You can choose a Compact, Comfortable, or Roomy card layout, and the app remembers your choice. The opening screen can be set to Quick, Standard, or Leisurely, with an optional sound that is off by default. Model pages now include **Prefer This Hero** to protect your chosen image, and AI hero selection now favors clean single-model renders rather than exploded diagrams or multi-view sheets.
 
 ---
 
