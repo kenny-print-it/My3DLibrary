@@ -1,5 +1,5 @@
-My3DLibrary v1.3 Beta (Build 2) — Windows Portable
-====================================================
+My3DLibrary v1.3 Beta (Build 5 Test) — Windows Portable
+=========================================================
 
 GETTING STARTED
 ---------------
@@ -19,6 +19,10 @@ BUILD 4: PERSONALIZE YOUR LIBRARY
 The My3DLibrary logo is beside the Library title and model count. The title, search, sort, selection, and filter controls stay visible while you browse. On ultra-wide monitors, the Library uses more of the available width to show additional model cards per row. Phone layouts remain compact.
 
 In Settings → Appearance, choose My3DLibrary Light, Dark, or High Contrast. You can choose a Quick, Standard, or Leisurely opening screen; its optional sound is off by default. The Library toolbar has Compact, Comfortable, and Roomy card sizes. On a model page, Prefer This Hero locks the image you want to keep. AI hero selection now prefers a clean single-model render over exploded or multi-view sheets.
+
+BUILD 5 TEST: 3MF PREVIEW REPAIR
+---------------------------------
+This Windows test build improves the built-in 3MF preview for standard multi-part projects and transformed model pieces. If a model already has a regular render image, select View 3D model below it to open the interactive STL or 3MF preview. Generated thumbnails use the same improved reader. The model-folder action continues to bring the selected folder to the front.
 
 AI AUTO-TAGGING (OPTIONAL)
 ---------------------------

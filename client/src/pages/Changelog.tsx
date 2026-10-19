@@ -14,9 +14,19 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v1.3 Beta — Build 5 Test",
+    date: "October 2026",
+    label: "Test build",
+    entries: [
+      { type: "fix", text: "3MF preview compatibility — the built-in viewer now uses the standard Three.js 3MF reader, so multi-part 3MF projects and transformed model parts can display correctly" },
+      { type: "feat", text: "View 3D model — when a model already has render images, select this option to open its interactive STL or 3MF preview without replacing the current thumbnail" },
+      { type: "improve", text: "Safer thumbnail generation — the thumbnail tool now uses the same updated 3MF reader as the interactive preview" },
+      { type: "fix", text: "Folder opening reliability — the model-folder action continues to bring the selected folder to the front rather than leaving it behind another window" },
+    ],
+  },
+  {
     version: "v1.3 Beta — Build 4",
     date: "September 2026",
-    label: "Current",
     entries: [
       { type: "feat", text: "My3DLibrary Light, Dark, and High Contrast themes — choose your preferred look in Settings → Appearance; the app remembers the choice" },
       { type: "feat", text: "Startup preferences — select Quick, Standard, or Leisurely opening timing, with an optional startup sound that remains off by default" },

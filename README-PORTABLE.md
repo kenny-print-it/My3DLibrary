@@ -36,6 +36,10 @@ Under **Settings → Appearance**, choose the My3DLibrary Light theme, Dark them
 
 The Library toolbar offers **Compact**, **Comfortable**, and **Roomy** card density choices. On a model page, select **Prefer This Hero** under the image you want to keep; later AI re-picks will leave that manual choice alone. AI hero selection also now favors a clean, assembled single-model render rather than exploded diagrams or multi-view image sheets.
 
+### Build 5 Test: 3MF Preview Repair
+
+This Windows test build improves 3MF previews for standard multi-part projects and model pieces that have been moved or rotated inside a 3MF. If a model already has a normal render image, use **View 3D model** below the image to open its interactive 3MF or STL preview. Generated thumbnails use the same improved reader. The model-folder action continues to bring the selected folder to the front.
+
 ---
 
 ## Folder Structure

@@ -16,130 +16,7 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
-
-// ---------------------------------------------------------------------------
-// STL parser (binary + ASCII)
-// ---------------------------------------------------------------------------
-function parseSTL(buffer: ArrayBuffer): THREE.BufferGeometry {
-  const geometry = new THREE.BufferGeometry();
-
-  const view = new DataView(buffer);
-  const numTriangles = view.getUint32(80, true);
-  const expectedSize = 84 + numTriangles * 50;
-
-  if (buffer.byteLength === expectedSize && numTriangles > 0) {
-    // Binary STL
-    const positions: number[] = [];
-    const normals: number[] = [];
-    let offset = 84;
-    for (let i = 0; i < numTriangles; i++) {
-      const nx = view.getFloat32(offset, true);
-      const ny = view.getFloat32(offset + 4, true);
-      const nz = view.getFloat32(offset + 8, true);
-      offset += 12;
-      for (let v = 0; v < 3; v++) {
-        positions.push(
-          view.getFloat32(offset, true),
-          view.getFloat32(offset + 4, true),
-          view.getFloat32(offset + 8, true)
-        );
-        normals.push(nx, ny, nz);
-        offset += 12;
-      }
-      offset += 2; // attribute byte count
-    }
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-    return geometry;
-  }
-
-  // ASCII STL fallback
-  const text = new TextDecoder().decode(buffer);
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const normalRe = /facet normal\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)/g;
-  const vertexRe = /vertex\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)/g;
-  let nm: RegExpExecArray | null;
-  let vm: RegExpExecArray | null;
-  while ((nm = normalRe.exec(text)) !== null) {
-    const nx = parseFloat(nm[1]);
-    const ny = parseFloat(nm[2]);
-    const nz = parseFloat(nm[3]);
-    for (let v = 0; v < 3; v++) {
-      vm = vertexRe.exec(text);
-      if (!vm) break;
-      positions.push(parseFloat(vm[1]), parseFloat(vm[2]), parseFloat(vm[3]));
-      normals.push(nx, ny, nz);
-    }
-  }
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-  return geometry;
-}
-
-// ---------------------------------------------------------------------------
-// 3MF parser — unzip with fflate, parse XML geometry
-// ---------------------------------------------------------------------------
-async function parse3MF(buffer: ArrayBuffer): Promise<THREE.BufferGeometry> {
-  const { unzipSync } = await import("fflate");
-
-  const uint8 = new Uint8Array(buffer);
-  const files = unzipSync(uint8);
-
-  let modelXml: string | null = null;
-  for (const name of Object.keys(files)) {
-    if (name.toLowerCase().endsWith(".model")) {
-      modelXml = new TextDecoder().decode(files[name]);
-      break;
-    }
-  }
-
-  if (!modelXml) {
-    throw new Error("No .model file found inside 3MF archive");
-  }
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(modelXml, "text/xml");
-
-  const positions: number[] = [];
-  const indices: number[] = [];
-
-  const objects = doc.querySelectorAll("object");
-  for (const obj of Array.from(objects)) {
-    const vertexEls = obj.querySelectorAll("vertex");
-    const triEls = obj.querySelectorAll("triangle");
-
-    if (vertexEls.length === 0 || triEls.length === 0) continue;
-
-    const baseIndex = positions.length / 3;
-
-    for (const v of Array.from(vertexEls)) {
-      positions.push(
-        parseFloat(v.getAttribute("x") || "0"),
-        parseFloat(v.getAttribute("y") || "0"),
-        parseFloat(v.getAttribute("z") || "0")
-      );
-    }
-
-    for (const t of Array.from(triEls)) {
-      indices.push(
-        baseIndex + parseInt(t.getAttribute("v1") || "0", 10),
-        baseIndex + parseInt(t.getAttribute("v2") || "0", 10),
-        baseIndex + parseInt(t.getAttribute("v3") || "0", 10)
-      );
-    }
-  }
-
-  if (positions.length === 0) {
-    throw new Error("No geometry found in 3MF model");
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-}
+import { centerAndScaleModel, disposeModel, loadModelObject, modelLoadErrorMessage } from "@/lib/modelGeometry";
 
 // ---------------------------------------------------------------------------
 // Public handle type
@@ -186,7 +63,7 @@ const STLViewer = forwardRef<STLViewerHandle, STLViewerProps>(
     const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
     const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-    const meshRef = useRef<THREE.Mesh | null>(null);
+    const meshRef = useRef<THREE.Object3D | null>(null);
     const rotRef = useRef({ x: 0, y: 0, userRotated: false });
     const zoomRef = useRef(1);
     const loadedRef = useRef(false);
@@ -315,22 +192,11 @@ const STLViewer = forwardRef<STLViewerHandle, STLViewerProps>(
         })
         .then(async (buf) => {
           if (cancelled) return;
-          const geo = fileType === "3mf" ? await parse3MF(buf) : parseSTL(buf);
+          const model = loadModelObject(buf, fileType);
           if (cancelled) return;
-          geo.computeBoundingBox();
-          const box = geo.boundingBox!;
-          const center = new THREE.Vector3();
-          box.getCenter(center);
-          geo.translate(-center.x, -center.y, -center.z);
-          const size = new THREE.Vector3();
-          box.getSize(size);
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const scale = 3 / maxDim;
-          const mat = new THREE.MeshPhongMaterial({ color: 0xe8a020, specular: 0x444444, shininess: 30 });
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.scale.setScalar(scale);
-          scene.add(mesh);
-          meshRef.current = mesh;
+          centerAndScaleModel(model);
+          scene.add(model);
+          meshRef.current = model;
           loadedRef.current = true;
           setLoading(false);
           onLoadedRef.current?.();
@@ -338,7 +204,7 @@ const STLViewer = forwardRef<STLViewerHandle, STLViewerProps>(
         .catch((err) => {
           if (cancelled) return;
           console.warn("[STLViewer] Load error:", err);
-          setError(`Could not load ${fileType.toUpperCase()}`);
+          setError(modelLoadErrorMessage(fileType, err));
           setLoading(false);
         });
 
@@ -364,6 +230,10 @@ const STLViewer = forwardRef<STLViewerHandle, STLViewerProps>(
         el.removeEventListener("touchstart", onTouchStart);
         el.removeEventListener("touchmove", onTouchMove);
         el.removeEventListener("touchend", onTouchEnd);
+        if (meshRef.current) {
+          scene.remove(meshRef.current);
+          disposeModel(meshRef.current);
+        }
         renderer.dispose();
         if (renderer.domElement && el.contains(renderer.domElement)) {
           el.removeChild(renderer.domElement);
@@ -386,7 +256,7 @@ const STLViewer = forwardRef<STLViewerHandle, STLViewerProps>(
           </div>
         )}
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-secondary/80 text-muted-foreground text-xs">
+          <div className="absolute inset-0 flex items-center justify-center bg-secondary/80 px-5 text-center text-muted-foreground text-xs">
             {error}
           </div>
         )}

@@ -14,116 +14,12 @@
  */
 
 import * as THREE from "three";
-
-// ---------------------------------------------------------------------------
-// Re-export the same parsers used in STLViewer so we don't duplicate them.
-// ---------------------------------------------------------------------------
-function parseSTL(buffer: ArrayBuffer): THREE.BufferGeometry {
-  const geometry = new THREE.BufferGeometry();
-  const view = new DataView(buffer);
-  const numTriangles = view.getUint32(80, true);
-  const expectedSize = 84 + numTriangles * 50;
-
-  if (buffer.byteLength === expectedSize && numTriangles > 0) {
-    const positions: number[] = [];
-    const normals: number[] = [];
-    let offset = 84;
-    for (let i = 0; i < numTriangles; i++) {
-      const nx = view.getFloat32(offset, true);
-      const ny = view.getFloat32(offset + 4, true);
-      const nz = view.getFloat32(offset + 8, true);
-      offset += 12;
-      for (let v = 0; v < 3; v++) {
-        positions.push(
-          view.getFloat32(offset, true),
-          view.getFloat32(offset + 4, true),
-          view.getFloat32(offset + 8, true)
-        );
-        normals.push(nx, ny, nz);
-        offset += 12;
-      }
-      offset += 2;
-    }
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-    return geometry;
-  }
-
-  const text = new TextDecoder().decode(buffer);
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const normalRe = /facet normal\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)/g;
-  const vertexRe = /vertex\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)/g;
-  let nm: RegExpExecArray | null;
-  let vm: RegExpExecArray | null;
-  while ((nm = normalRe.exec(text)) !== null) {
-    const nx = parseFloat(nm[1]);
-    const ny = parseFloat(nm[2]);
-    const nz = parseFloat(nm[3]);
-    for (let v = 0; v < 3; v++) {
-      vm = vertexRe.exec(text);
-      if (!vm) break;
-      positions.push(parseFloat(vm[1]), parseFloat(vm[2]), parseFloat(vm[3]));
-      normals.push(nx, ny, nz);
-    }
-  }
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-  return geometry;
-}
-
-async function parse3MF(buffer: ArrayBuffer): Promise<THREE.BufferGeometry> {
-  const { unzipSync } = await import("fflate");
-  const uint8 = new Uint8Array(buffer);
-  const files = unzipSync(uint8);
-
-  let modelXml: string | null = null;
-  for (const name of Object.keys(files)) {
-    if (name.toLowerCase().endsWith(".model")) {
-      modelXml = new TextDecoder().decode(files[name]);
-      break;
-    }
-  }
-  if (!modelXml) throw new Error("No .model file found inside 3MF archive");
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(modelXml, "text/xml");
-  const positions: number[] = [];
-  const indices: number[] = [];
-
-  for (const obj of Array.from(doc.querySelectorAll("object"))) {
-    const vertexEls = obj.querySelectorAll("vertex");
-    const triEls = obj.querySelectorAll("triangle");
-    if (vertexEls.length === 0 || triEls.length === 0) continue;
-    const baseIndex = positions.length / 3;
-    for (const v of Array.from(vertexEls)) {
-      positions.push(
-        parseFloat(v.getAttribute("x") || "0"),
-        parseFloat(v.getAttribute("y") || "0"),
-        parseFloat(v.getAttribute("z") || "0")
-      );
-    }
-    for (const t of Array.from(triEls)) {
-      indices.push(
-        baseIndex + parseInt(t.getAttribute("v1") || "0", 10),
-        baseIndex + parseInt(t.getAttribute("v2") || "0", 10),
-        baseIndex + parseInt(t.getAttribute("v3") || "0", 10)
-      );
-    }
-  }
-
-  if (positions.length === 0) throw new Error("No geometry found in 3MF model");
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-}
+import { centerAndScaleModel, disposeModel, loadModelObject } from "@/lib/modelGeometry";
 
 // ---------------------------------------------------------------------------
 // Build a reusable Three.js scene with the geometry
 // ---------------------------------------------------------------------------
-function buildScene(geometry: THREE.BufferGeometry) {
+function buildScene(model: THREE.Object3D) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#1a1a1a");
 
@@ -139,27 +35,10 @@ function buildScene(geometry: THREE.BufferGeometry) {
   dir3.position.set(0, -3, 0);
   scene.add(dir3);
 
-  // Centre and normalise geometry
-  geometry.computeBoundingBox();
-  const box = geometry.boundingBox!;
-  const center = new THREE.Vector3();
-  box.getCenter(center);
-  geometry.translate(-center.x, -center.y, -center.z);
-  const size = new THREE.Vector3();
-  box.getSize(size);
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const scale = 3 / maxDim;
+  centerAndScaleModel(model);
+  scene.add(model);
 
-  const mat = new THREE.MeshPhongMaterial({
-    color: 0xe8a020,
-    specular: 0x555555,
-    shininess: 35,
-  });
-  const mesh = new THREE.Mesh(geometry, mat);
-  mesh.scale.setScalar(scale);
-  scene.add(mesh);
-
-  return { scene, mesh };
+  return { scene, model };
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +117,7 @@ export async function generateThumbnail(opts: ThumbnailOptions): Promise<Blob> {
 
   onProgress?.(0.2);
 
-  const geometry = fileType === "3mf" ? await parse3MF(buffer) : parseSTL(buffer);
+  const model = loadModelObject(buffer, fileType);
 
   onProgress?.(0.35);
 
@@ -252,7 +131,7 @@ export async function generateThumbnail(opts: ThumbnailOptions): Promise<Blob> {
   renderer.setSize(SAMPLE_SIZE, SAMPLE_SIZE);
   renderer.setPixelRatio(1);
 
-  const { scene } = buildScene(geometry);
+  const { scene } = buildScene(model);
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10000);
 
@@ -316,6 +195,7 @@ export async function generateThumbnail(opts: ThumbnailOptions): Promise<Blob> {
   });
 
   finalRenderer.dispose();
+  disposeModel(model);
   onProgress?.(1.0);
 
   return blob;

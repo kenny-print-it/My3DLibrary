@@ -23,3 +23,14 @@
 - [x] Add clear in-app confirmation that render images are sent to Google and free-tier availability is quota-limited
 - [x] Update the GitHub README, portable readmes, and in-app changelog to recommend Gemini online and limit Groq to legacy text-only use
 - [x] Build, verify, and publish refreshed Windows and Mac v1.3 beta packages without removing the original Build 1 assets
+## Portable 3MF Preview Repair
+- [x] Trace why 3MF model geometry can fail to render in the Windows portable app
+- [x] Repair the portable 3MF preview path without affecting STL or multi-file viewing
+- [x] Add regression coverage for valid 3MF geometry and clear unsupported-file feedback
+- [x] Build and verify the Windows portable app locally without publishing or pushing
+
+## Build 5 Windows Test Release
+- [x] Update portable source and release notes for the Build 5 3MF-preview test build
+- [x] Build and validate the Windows Build 5 test archive
+- [ ] Commit and push the Build 5 source update
+- [ ] Upload the Windows Build 5 test archive without removing prior release assets

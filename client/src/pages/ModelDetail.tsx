@@ -44,6 +44,8 @@ export default function ModelDetail() {
     setFileTypeFilter(null);
     setExpandedZips(new Set());
     setViewerFileIdx(0);
+    setShow3DPreview(false);
+    setRetakeThumbnail(false);
   }, [modelId]);
 
   // Track scroll position to show/hide sticky title bar
@@ -75,8 +77,10 @@ export default function ModelDetail() {
   // Inline rename state: { fileId, fileType, value }
   const [renamingFile, setRenamingFile] = useState<{ fileId: string; fileType: "image" | "model"; value: string } | null>(null);
   const [deletingFile, setDeletingFile] = useState<{ fileId: string; fileType: "image" | "model"; name: string } | null>(null);
-  // 3D viewer file selector index (when multiple STL/3MF files exist and no images)
+  // 3D viewer file selector index (3MFs remain preferred over STLs)
   const [viewerFileIdx, setViewerFileIdx] = useState(0);
+  // Everyone can switch from a static render to the interactive 3D preview.
+  const [show3DPreview, setShow3DPreview] = useState(false);
   // Thumbnail generation state
   const [thumbGenProgress, setThumbGenProgress] = useState<number | null>(null);
   // Retake thumbnail mode: show 3D viewer even when images exist so user can re-orient and capture
@@ -348,6 +352,7 @@ export default function ModelDetail() {
       const b3mf = b.name?.toLowerCase().endsWith(".3mf") ? 0 : 1;
       return a3mf - b3mf;
     });
+  const showing3DViewer = viewableFiles.length > 0 && (images.length === 0 || show3DPreview || retakeThumbnail);
   const rawFiles: any[] = model.modelFiles as any[] || [];
 
   // Prioritize: docs/PDFs/instructions first, then images, then 3D model files
@@ -502,9 +507,9 @@ export default function ModelDetail() {
           <div
             ref={carouselRef}
             className="relative aspect-[4/3] rounded-xl overflow-hidden bg-muted cursor-pointer group"
-            onClick={() => !retakeThumbnail && images.length > 0 && setLightbox(true)}
+            onClick={() => !showing3DViewer && images.length > 0 && setLightbox(true)}
           >
-            {retakeThumbnail && viewableFiles.length > 0 ? (
+            {showing3DViewer ? (
               <STLViewer
                 ref={viewerRef}
                 url={viewableFiles[viewerFileIdx]?.webContentLink}
@@ -518,14 +523,6 @@ export default function ModelDetail() {
                 alt={images[activeImg]?.name}
                 className="w-full h-full object-contain bg-muted"
               />
-            ) : viewableFiles.length > 0 ? (
-              <STLViewer
-                ref={viewerRef}
-                url={viewableFiles[viewerFileIdx]?.webContentLink}
-                fileType={viewableFiles[viewerFileIdx]?.name?.toLowerCase().endsWith(".3mf") ? "3mf" : "stl"}
-                className="w-full h-full"
-                bgColor="#0d0d0d"
-              />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
                 <Box className="w-16 h-16 opacity-20" />
@@ -533,7 +530,7 @@ export default function ModelDetail() {
               </div>
             )}
             {/* Hero image badge — hidden in retake mode */}
-            {!retakeThumbnail && images.length > 0 && activeImg === 0 && heroImageUrl && (
+            {!showing3DViewer && images.length > 0 && activeImg === 0 && heroImageUrl && (
               <div className="absolute top-3 left-3 flex items-center gap-2">
                 <div className="flex items-center gap-1 bg-amber-500/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full">
                   <Star className="w-3 h-3 fill-black" /> Hero
@@ -573,7 +570,7 @@ export default function ModelDetail() {
             )}
 
             {/* Nav arrows — hidden in retake mode */}
-            {!retakeThumbnail && images.length > 1 && (
+            {!showing3DViewer && images.length > 1 && (
               <>
                 <button onClick={(e) => { e.stopPropagation(); prevImg(); }} className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80">
                   <ChevronLeft className="w-4 h-4" />
@@ -589,14 +586,24 @@ export default function ModelDetail() {
               </>
             )}
 
-            {!retakeThumbnail && images.length > 0 && (
+            {!showing3DViewer && images.length > 0 && (
               <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                 <span className="text-xs bg-black/60 text-white px-2 py-1 rounded-full backdrop-blur-sm">{activeImg + 1} / {images.length}</span>
               </div>
             )}
           </div>
 
-          {!retakeThumbnail && isOwner && images.length > 0 && (
+          {viewableFiles.length > 0 && images.length > 0 && !retakeThumbnail && (
+            <button
+              onClick={() => setShow3DPreview((visible) => !visible)}
+              className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+            >
+              <Box className="h-4 w-4" />
+              {show3DPreview ? "View images" : "View 3D model"}
+            </button>
+          )}
+
+          {!showing3DViewer && isOwner && images.length > 0 && (
             <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">{activeImageIsHero ? "Preferred hero image" : "Choose this image as the hero"}</p>
@@ -691,8 +698,8 @@ export default function ModelDetail() {
             </div>
           )}
 
-          {/* 3D file selector — shown when there are multiple viewable files and no images, or in retake mode */}
-          {(images.length === 0 || retakeThumbnail) && viewableFiles.length > 1 && (
+          {/* 3D file selector — shown whenever the interactive viewer is open. */}
+          {showing3DViewer && viewableFiles.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {viewableFiles.map((f, i) => {
                 const ext = f.name?.split(".").pop()?.toUpperCase() || "";
@@ -739,7 +746,7 @@ export default function ModelDetail() {
                   return (
                     <div key={img.fileId || img.thumbnailLink} className="relative shrink-0 group/thumb">
                       <button
-                        onClick={() => setActiveImg(i)}
+                        onClick={() => { setActiveImg(i); setShow3DPreview(false); }}
                         className={cn(
                           "w-16 h-16 rounded-lg overflow-hidden border-2 transition-all block",
                           i === activeImg ? "border-primary" : isHero ? "border-amber-500" : "border-transparent opacity-60 hover:opacity-100"
