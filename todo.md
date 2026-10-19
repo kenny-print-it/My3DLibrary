@@ -32,5 +32,5 @@
 ## Build 5 Windows Test Release
 - [x] Update portable source and release notes for the Build 5 3MF-preview test build
 - [x] Build and validate the Windows Build 5 test archive
-- [ ] Commit and push the Build 5 source update
-- [ ] Upload the Windows Build 5 test archive without removing prior release assets
+- [x] Commit and push the Build 5 source update
+- [x] Upload the Windows Build 5 test archive without removing prior release assets
